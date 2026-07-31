@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>OpenAgent — setup form harness</title>
+  <link rel="stylesheet" href="../options/options.css" />
+  <style>
+    #log { font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; }
+    .pass { color: var(--ok); } .fail { color: var(--err); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1><span class="logo">◆</span> Setup form harness</h1>
+    <p class="subtitle">Runs the real provider-setup component against a fake <code>chrome.storage</code>, outside Chrome. Open with any static server: <code>python3 -m http.server</code> then visit <code>/scripts/dev-harness.html</code>.</p>
+
+    <section><h2>Live form</h2><div id="setup-form"></div></section>
+    <section><h2>Assertions</h2><div id="log"></div></section>
+  </main>
+
+  <!-- Stub the extension APIs the component touches, before the module loads. -->
+  <script>
+    const store = {};
+    window.chrome = {
+      storage: {
+        local: {
+          get: (key) => Promise.resolve(typeof key === 'string' ? { [key]: store[key] } : { ...store }),
+          set: (obj) => Object.assign(store, obj) && Promise.resolve(),
+        },
+        onChanged: { addListener() {} },
+      },
+      // Stands in for the background worker relaying to the offscreen host.
+      runtime: {
+        sendMessage: (msg) =>
+          Promise.resolve(
+            msg.type === 'availability'
+              ? { ok: true, result: { state: 'downloadable', detail: `stub: ${msg.engine} would download on first use` } }
+              : msg.type === 'list_models'
+                ? { ok: true, result: [{ id: 'stub-model-a', label: 'Stub model A' }] }
+                : { ok: false, error: 'unsupported in harness' }
+          ),
+        onMessage: { addListener() {}, removeListener() {} },
+      },
+    };
+    window.__store = store;
+  </script>
+
+  <script type="module">
+    import { createSetupForm, loadConfig } from '../ui/setup.js';
+    import { configProblem } from '../providers/index.js';
+
+    const log = document.getElementById('log');
+    let failures = 0;
+    const check = (name, condition, detail = '') => {
+      failures += condition ? 0 : 1;
+      const line = document.createElement('div');
+      line.className = condition ? 'pass' : 'fail';
+      line.textContent = `${condition ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`;
+      log.appendChild(line);
+    };
+
+    const form = createSetupForm(document.getElementById('setup-form'));
+    await form.load();
+
+    const root = document.getElementById('setup-form');
+    const providerSelect = root.querySelector('select');
+    const modelSelect = root.querySelectorAll('select')[1];
+    const apiKeyInput = root.querySelector('input[type="password"]');
+
+    // Default provider must arrive with a model already chosen.
+    check('default provider has a model preselected', !!form.getState().providers.anthropic?.model,
+      form.getState().providers.anthropic?.model);
+
+    // The v0.1 bug: switching providers wrote the previous provider's field
+    // values into the new provider, leaving it with no model.
+    providerSelect.value = 'gemini';
+    providerSelect.dispatchEvent(new Event('change'));
+    const geminiModel = form.getState().providers.gemini?.model;
+    check('switching to Gemini selects a Gemini model', /^gemini/.test(geminiModel || ''), geminiModel);
+    check('model dropdown shows the same value', modelSelect.value === geminiModel, modelSelect.value);
+
+    // Round-trip back and forth must not corrupt either provider.
+    providerSelect.value = 'anthropic';
+    providerSelect.dispatchEvent(new Event('change'));
+    providerSelect.value = 'gemini';
+    providerSelect.dispatchEvent(new Event('change'));
+    check('round-trip keeps Gemini model intact', form.getState().providers.gemini?.model === geminiModel,
+      form.getState().providers.gemini?.model);
+    check('round-trip keeps Anthropic model intact', /^claude/.test(form.getState().providers.anthropic?.model || ''),
+      form.getState().providers.anthropic?.model);
+
+    // With a key typed in, the config must be considered runnable.
+    apiKeyInput.value = 'AIzaTESTKEY';
+    apiKeyInput.dispatchEvent(new Event('input'));
+    check('config is runnable once a key is entered', configProblem(form.getState()) === null,
+      configProblem(form.getState()) || 'no problem');
+
+    // Custom model entry path.
+    modelSelect.value = '__custom__';
+    modelSelect.dispatchEvent(new Event('change'));
+    const customInput = root.querySelector('input[placeholder="exact model id"]');
+    customInput.value = 'my-finetuned-model';
+    customInput.dispatchEvent(new Event('input'));
+    check('custom model id is stored', form.getState().providers.gemini?.model === 'my-finetuned-model',
+      form.getState().providers.gemini?.model);
+
+    // Saving persists to (fake) storage and reloads identically.
+    root.querySelectorAll('button')[1].click(); // Save
+    await new Promise((r) => setTimeout(r, 30));
+    const reloaded = await loadConfig();
+    check('saved config persists', reloaded.providers?.gemini?.model === 'my-finetuned-model',
+      JSON.stringify(reloaded.providers?.gemini));
+
+    // On-device providers: no key field, and availability is probed up front.
+    providerSelect.value = 'builtin';
+    providerSelect.dispatchEvent(new Event('change'));
+    await new Promise((r) => setTimeout(r, 50));
+    check('built-in AI needs no key field', apiKeyInput.closest('.field').classList.contains('hidden'));
+    check('built-in AI hides the model picker', modelSelect.closest('.field').classList.contains('hidden'));
+    check('built-in AI config is runnable as-is', configProblem(form.getState()) === null,
+      configProblem(form.getState()) || 'no problem');
+    check('device availability is reported', root.querySelector('.setup-status').textContent.includes('stub'),
+      root.querySelector('.setup-status').textContent);
+
+    providerSelect.value = 'webllm';
+    providerSelect.dispatchEvent(new Event('change'));
+    check('WebLLM preselects an open-source model', /MLC$/.test(form.getState().providers.webllm?.model || ''),
+      form.getState().providers.webllm?.model);
+
+    // Arabic + RTL: the whole document must flip, and strings must be real
+    // translations rather than English left in place.
+    const { applyLanguage, t } = await import('../ui/i18n.js');
+    applyLanguage('ar');
+    check('Arabic sets document direction to RTL', document.documentElement.dir === 'rtl', document.documentElement.dir);
+    check('Arabic sets the lang attribute', document.documentElement.lang === 'ar');
+    check('UI strings are actually Arabic', /[؀-ۿ]/.test(t('setup.title')), t('setup.title'));
+    check('routine schedules translate', /[؀-ۿ]/.test(t('sched.daily', '09:00')), t('sched.daily', '09:00'));
+    check('placeholders substitute in Arabic', t('status.thinking', 2, 9).includes('2'), t('status.thinking', 2, 9));
+
+    // Rebuilding the form under Arabic must produce Arabic labels.
+    const arRoot = document.createElement('div');
+    document.querySelector('section').appendChild(arRoot);
+    const arForm = createSetupForm(arRoot);
+    await arForm.load();
+    check('form labels render in Arabic', /[؀-ۿ]/.test(arRoot.querySelector('label').textContent),
+      arRoot.querySelector('label').textContent);
+    arRoot.remove();
+
+    applyLanguage('en');
+    check('switching back restores LTR', document.documentElement.dir === 'ltr');
+
+    const summary = document.createElement('div');
+    summary.className = failures ? 'fail' : 'pass';
+    summary.style.marginTop = '12px';
+    summary.textContent = failures ? `${failures} ASSERTION(S) FAILED` : 'ALL ASSERTIONS PASSED';
+    log.appendChild(summary);
+  </script>
+</body>
+</html>

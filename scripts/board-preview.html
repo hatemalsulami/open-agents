@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Board preview</title>
+  <link rel="stylesheet" href="../sidepanel/panel.css" />
+  <style>body { max-width: 420px; margin: 0 auto; }</style>
+</head>
+<body>
+  <main id="board-view">
+    <div class="view-intro"><strong>Task board</strong><p id="board-stats" class="board-stats-head"></p></div>
+    <div id="board-live"></div>
+    <div class="board-history-head"><strong>History</strong><button id="board-clear" class="ghost small hidden">Clear</button></div>
+    <p id="board-history-empty" class="hint hidden">Finished tasks show here.</p>
+    <div id="board-history"></div>
+  </main>
+
+  <script>
+    // Minimal chrome + i18n stubs so the real board module runs standalone.
+    window.chrome = { runtime: { sendMessage: () => {} } };
+  </script>
+  <script type="module">
+    // Stub i18n to English literals matching the keys we use.
+    const map = {
+      'board.activeCount': '$1 of $2 agents working now', 'board.noneActive': '$1 agents, none active',
+      'board.running': 'working', 'board.waiting': 'needs you', 'board.idle': 'idle', 'board.error': 'error',
+      'board.working': 'Working', 'board.done': 'Finished', 'board.newAgent': '＋ New agent',
+      'board.open': 'Open', 'board.openTab': 'Jump to tab', 'board.cardStats': '$1 actions · $2 shots',
+      'board.historyTokens': '$1 calls · $2 tokens', 'board.justNow': 'just now', 'board.minsAgo': '$1 min ago',
+      'board.hoursAgo': '$1 h ago',
+    };
+    const t = (k, ...a) => (map[k] || k).replace(/\$(\d)/g, (_, i) => a[i - 1] ?? '');
+    const locale = () => 'en-US';
+
+    // Inline a trimmed copy of the board renderer against these stubs.
+    const { createBoardView } = await import('../sidepanel/board-view.js').catch(async () => {
+      // board-view imports i18n; shim it via a blob module.
+      return {};
+    });
+
+    // Simplest path: import the real module but pre-seed its i18n by module mock
+    // isn't available here, so render inline with the same markup instead.
+    const live = document.getElementById('board-live');
+    const stats = document.getElementById('board-stats');
+    const sessions = [
+      { id:'a', title:'Update GASTAT sheet tab names', color:'blue', status:'running',
+        activity:{ action:'Typing', step:12, maxSteps:30, page:'Salla Radar - Zad Saudi Sectors', url:'https://docs.google.com/spreadsheets/d/1WC1' },
+        toolCount:34, screenshotCount:8, lastMessage:'' },
+      { id:'b', title:'Compare 3 espresso machines', color:'purple', status:'waiting',
+        activity:{ action:'Clicking', step:7, maxSteps:30, page:'Amazon.sa', url:'https://amazon.sa/s?k=espresso' },
+        toolCount:14, screenshotCount:3, lastMessage:'' },
+      { id:'c', title:'Summarize Hacker News', color:'green', status:'idle',
+        activity:{ url:'https://news.ycombinator.com', page:'Hacker News' },
+        toolCount:9, screenshotCount:1, lastMessage:'The top 5 stories are about AI agents, a new database, and two hardware launches.' },
+    ];
+    stats.textContent = t('board.activeCount', 2, 3);
+
+    for (const s of sessions) {
+      const card = document.createElement('div');
+      card.className = `board-card status-${s.status}`;
+      card.innerHTML = `
+        <div class="board-card-head">
+          <span class="status-dot ${s.status}"></span>
+          <span class="board-card-title">${s.title}</span>
+          <span class="board-badge ${s.status}">${t('board.'+s.status)}</span>
+        </div>
+        <div class="board-activity">${s.status==='idle' ? s.lastMessage : `<span class="spinner"></span><span>${s.activity.action} · ${s.activity.step}/${s.activity.maxSteps}</span>`}</div>
+        <button class="board-page"><span>${s.activity.page}</span></button>
+        <div class="board-foot"><span class="board-stats-line">${t('board.cardStats', s.toolCount, s.screenshotCount)}</span><button class="board-open">${t('board.open')}</button></div>`;
+      live.appendChild(card);
+    }
+    const add = document.createElement('button');
+    add.className = 'board-add'; add.textContent = t('board.newAgent');
+    live.appendChild(add);
+
+    const hist = document.getElementById('board-history');
+    for (const h of [
+      { title:'Find suppliers in Riyadh', sub:'Found 6 suppliers with contact details.', when:'12 min ago', tok:'8 calls · 12,400 tokens', status:'idle' },
+      { title:'Check competitor prices', sub:'Blocked: site required a login.', when:'1 h ago', tok:'4 calls · 5,200 tokens', status:'error' },
+    ]) {
+      const row = document.createElement('div');
+      row.className = `history-row status-${h.status}`;
+      row.innerHTML = `<div class="history-main"><div class="history-title">${h.title}</div><div class="history-sub">${h.sub}</div></div><div class="history-meta"><span>${h.when}</span><span class="history-tokens">${h.tok}</span></div>`;
+      hist.appendChild(row);
+    }
+  </script>
+</body>
+</html>

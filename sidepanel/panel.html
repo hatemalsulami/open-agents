@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenAgent</title>
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo" data-icon="sparkle" data-icon-size="17"></span>
+      <button id="model-badge" class="badge">…</button>
+    </div>
+    <div class="header-actions">
+      <button id="toggle-voice" class="tab-btn" data-icon="volumeOff" data-i18n-title="voice.toggleOff"></button>
+      <button id="toggle-lang" class="tab-btn lang-btn" data-i18n-title="header.language"></button>
+      <button id="open-dashboard" class="tab-btn" data-icon="gauge" data-i18n-title="header.dashboard"></button>
+      <button id="toggle-setup" class="tab-btn" data-icon="sliders" data-i18n-title="header.setup"></button>
+    </div>
+  </header>
+
+  <!-- Primary navigation: one row of labelled tabs -->
+  <nav id="main-nav">
+    <button id="tab-chat" class="nav-tab active" data-icon="chat" data-i18n-title="header.agents">
+      <span data-i18n="nav.chat"></span>
+    </button>
+    <button id="tab-board" class="nav-tab" data-icon="board" data-i18n-title="header.board">
+      <span data-i18n="nav.board"></span>
+    </button>
+    <button id="tab-routines" class="nav-tab" data-icon="clock" data-i18n-title="header.routines">
+      <span data-i18n="nav.routines"></span>
+    </button>
+    <button id="tab-knowledge" class="nav-tab" data-icon="book" data-i18n-title="header.knowledge">
+      <span data-i18n="nav.knowledge"></span>
+    </button>
+  </nav>
+
+  <!-- Provider setup, inline so the options page is never required -->
+  <section id="setup-card" class="card hidden">
+    <div class="card-head">
+      <strong data-i18n="setup.title"></strong>
+      <button id="close-setup" class="icon-btn" data-icon="x" data-i18n-title="setup.close"></button>
+    </div>
+    <div id="setup-form"></div>
+    <button id="setup-dashboard" class="ghost full-width" data-i18n="setup.openDashboard"></button>
+    <details class="subscription-note">
+      <summary data-i18n="setup.subscriptionQ"></summary>
+      <p data-i18n="setup.subscriptionA1"></p>
+      <p data-i18n="setup.subscriptionA2"></p>
+    </details>
+  </section>
+
+  <!-- Agent session chips -->
+  <nav id="session-bar">
+    <div id="session-chips"></div>
+    <button id="new-session" class="icon-btn" data-icon="plus" data-i18n-title="session.new"></button>
+  </nav>
+
+  <!-- CHAT VIEW -->
+  <main id="chat-view">
+    <div id="messages" aria-live="polite"></div>
+  </main>
+
+  <!-- ROUTINES VIEW -->
+  <main id="routines-view" class="hidden">
+    <div class="view-intro">
+      <strong data-i18n="routines.title"></strong>
+      <p data-i18n="routines.intro"></p>
+    </div>
+    <div id="routines-list"></div>
+    <div class="card">
+      <div class="card-head"><strong id="routine-form-title"></strong></div>
+      <div class="field">
+        <label data-i18n="routines.name"></label>
+        <input id="r-name" type="text" data-i18n-placeholder="routines.namePlaceholder" />
+      </div>
+      <div class="field">
+        <label data-i18n="routines.task"></label>
+        <textarea id="r-prompt" rows="3" data-i18n-placeholder="routines.taskPlaceholder"></textarea>
+      </div>
+      <div class="field">
+        <label><span data-i18n="routines.url"></span> <span class="muted" data-i18n="routines.optional"></span></label>
+        <input id="r-url" type="text" placeholder="https://news.ycombinator.com" />
+      </div>
+      <div class="field">
+        <label data-i18n="routines.schedule"></label>
+        <select id="r-type">
+          <option value="daily" data-i18n="routines.daily"></option>
+          <option value="weekdays" data-i18n="routines.weekdays"></option>
+          <option value="weekly" data-i18n="routines.weekly"></option>
+          <option value="interval" data-i18n="routines.interval"></option>
+          <option value="once" data-i18n="routines.once"></option>
+        </select>
+      </div>
+      <div class="field" id="r-time-field">
+        <label data-i18n="routines.time"></label><input id="r-time" type="time" value="09:00" />
+      </div>
+      <div class="field hidden" id="r-day-field">
+        <label data-i18n="routines.day"></label>
+        <select id="r-day">
+          <option value="1" data-i18n="day.1"></option>
+          <option value="2" data-i18n="day.2"></option>
+          <option value="3" data-i18n="day.3"></option>
+          <option value="4" data-i18n="day.4"></option>
+          <option value="5" data-i18n="day.5"></option>
+          <option value="6" data-i18n="day.6"></option>
+          <option value="0" data-i18n="day.0"></option>
+        </select>
+      </div>
+      <div class="field hidden" id="r-interval-field">
+        <label data-i18n="routines.intervalLabel"></label><input id="r-interval" type="number" min="1" value="60" />
+      </div>
+      <div class="field hidden" id="r-once-field">
+        <label data-i18n="routines.datetime"></label><input id="r-once" type="datetime-local" />
+      </div>
+      <div class="setup-actions">
+        <button id="r-save" class="primary" data-i18n="routines.save"></button>
+        <button id="r-cancel" class="ghost hidden" data-i18n="routines.cancel"></button>
+        <span id="r-status" class="setup-status"></span>
+      </div>
+    </div>
+  </main>
+
+  <!-- BOARD VIEW — live mission control + history -->
+  <main id="board-view" class="hidden">
+    <div class="view-intro">
+      <strong data-i18n="board.title"></strong>
+      <p id="board-stats" class="board-stats-head"></p>
+    </div>
+    <div id="board-live"></div>
+
+    <div class="board-history-head">
+      <strong data-i18n="board.historyTitle"></strong>
+      <button id="board-clear" class="ghost small hidden" data-i18n="board.clear"></button>
+    </div>
+    <p id="board-history-empty" class="hint" data-i18n="board.historyEmpty"></p>
+    <div id="board-history"></div>
+  </main>
+
+  <!-- KNOWLEDGE VIEW — the agent's second brain -->
+  <main id="knowledge-view" class="hidden">
+    <div class="view-intro">
+      <strong data-i18n="kb.title"></strong>
+      <p data-i18n="kb.intro"></p>
+    </div>
+
+    <div id="drop-zone" class="drop-zone">
+      <p data-i18n="kb.drop"></p>
+      <button id="kb-pick" class="ghost" data-i18n="kb.pick"></button>
+      <input type="file" id="kb-file" class="hidden" multiple
+             accept=".txt,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.html,.xml" />
+      <p class="hint" data-i18n="kb.formats"></p>
+    </div>
+
+    <div id="kb-list"></div>
+
+    <div class="card">
+      <div class="card-head"><strong data-i18n="kb.noteTitle"></strong></div>
+      <div class="field">
+        <label data-i18n="kb.noteName"></label>
+        <input id="kb-name" type="text" data-i18n-placeholder="kb.noteNamePlaceholder" />
+      </div>
+      <div class="field">
+        <label data-i18n="kb.noteBody"></label>
+        <textarea id="kb-text" rows="5" data-i18n-placeholder="kb.noteBodyPlaceholder"></textarea>
+      </div>
+      <label class="checkline">
+        <input type="checkbox" id="kb-pinned" />
+        <span data-i18n="kb.pinLabel"></span>
+      </label>
+      <div class="setup-actions">
+        <button id="kb-save" class="primary" data-i18n="kb.saveNote"></button>
+        <span id="kb-status" class="setup-status"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><strong data-i18n="kb.bugTitle"></strong></div>
+      <p class="hint" data-i18n="kb.bugIntro"></p>
+      <div class="setup-actions">
+        <button id="bug-export" class="primary" data-i18n="kb.bugExport"></button>
+        <button id="bug-clear" class="ghost" data-i18n="kb.bugClear"></button>
+        <span id="bug-status" class="setup-status"></span>
+      </div>
+    </div>
+  </main>
+
+  <div id="approval-bar" class="hidden">
+    <div class="approval-text"><span id="approval-question"></span><pre id="approval-args"></pre></div>
+    <div class="approval-actions">
+      <button id="approve-btn" class="primary small" data-i18n="approval.allow"></button>
+      <button id="deny-btn" class="danger small" data-i18n="approval.deny"></button>
+    </div>
+  </div>
+
+  <footer id="composer-footer">
+    <div id="status-bar" class="hidden">
+      <span class="spinner"></span>
+      <span id="status-text"></span>
+      <span id="usage-text" class="usage"></span>
+      <button id="stop-btn" class="danger small" data-i18n="composer.stop"></button>
+    </div>
+
+    <!-- Tabs mentioned with @ — the agent's scope for the next task -->
+    <div id="mention-chips" class="hidden"></div>
+
+    <div class="composer-wrap">
+      <div id="mention-picker" class="hidden"></div>
+      <div class="composer">
+        <textarea id="input" rows="1" data-i18n-placeholder="composer.placeholder"></textarea>
+        <button id="send-btn" class="primary send-btn" data-icon="send" data-i18n-title="composer.send"></button>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="panel.js"></script>
+</body>
+</html>

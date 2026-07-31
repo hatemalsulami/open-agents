@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>OpenAgent local inference host</title></head>
+<body>
+  <!--
+    Invisible document that hosts on-device models. It exists because WebGPU
+    and the built-in Prompt API are unavailable in a service worker, and
+    because the side panel can be closed while an agent or routine is running.
+  -->
+  <script type="module" src="offscreen.js"></script>
+</body>
+</html>

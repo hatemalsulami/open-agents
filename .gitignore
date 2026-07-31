@@ -1,0 +1,6 @@
+.DS_Store
+*.zip
+node_modules/
+
+# Third-party runtime fetched by scripts/fetch-vendor.sh (6 MB, not vendored)
+vendor/

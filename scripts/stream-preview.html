@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><title>Streaming preview</title>
+<link rel="stylesheet" href="../sidepanel/panel.css"/>
+<style>body{width:400px;margin:0 auto}#log{font:11px ui-monospace;padding:8px}.pass{color:var(--ok)}.fail{color:var(--err);font-weight:700}</style>
+</head><body>
+<main id="chat-view"><div id="messages"></div></main>
+<footer id="composer-footer"><div id="status-bar"><span class="spinner"></span><span id="status-text">Thinking… (step 2/30)</span><span id="usage-text" class="usage"></span><button class="danger small">Stop</button></div></footer>
+<div id="log"></div>
+<script type="module">
+import { renderMarkdown } from '../sidepanel/markdown.js';
+import { formatCost } from '../providers/pricing.js';
+const messages=document.getElementById('messages');
+// 1. a finished answer
+const done=document.createElement('div'); done.className='msg assistant';
+done.appendChild(renderMarkdown('Found **3 options**. The best is [Model X](https://a.com) at 1,200 SAR.'));
+messages.appendChild(done);
+// 2. a live streaming bubble (mid-token)
+const live=document.createElement('div'); live.className='msg assistant streaming'; live.dataset.stream='s1';
+live.textContent='Now checking the second result, it looks like the price';
+messages.appendChild(live);
+// cost meter
+document.getElementById('usage-text').textContent = `≈${formatCost(0.0138)} · 6 calls · 12,480 in / 940 out`;
+
+const log=document.getElementById('log'); let f=0;
+const t=(n,c,g)=>{f+=c?0:1;const d=document.createElement('div');d.className=c?'pass':'fail';d.textContent=`${c?'✓':'✗'} ${n}${g?` — ${g}`:''}`;log.appendChild(d)};
+const cs=getComputedStyle(live,'::after');
+t('streaming bubble has a caret', cs.content!=='none' && cs.width!=='auto', `w=${cs.width}`);
+t('caret uses the accent color', cs.backgroundColor!=='rgba(0, 0, 0, 0)', cs.backgroundColor);
+t('finished bubble has no caret', getComputedStyle(done,'::after').content==='none');
+t('streaming preserves newlines', getComputedStyle(live).whiteSpace==='pre-wrap', getComputedStyle(live).whiteSpace);
+t('cost shown before token counts', document.getElementById('usage-text').textContent.startsWith('≈$0.014'), document.getElementById('usage-text').textContent);
+const s=document.createElement('div'); s.className=f?'fail':'pass'; s.textContent=f?`${f} FAILED`:'ALL PASSED'; log.appendChild(s);
+</script></body></html>

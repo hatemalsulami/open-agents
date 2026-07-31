@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>OpenAgent Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <header class="dash-head">
+      <div class="dash-brand">
+        <span class="logo" data-icon="sparkle" data-icon-size="22"></span>
+        <div>
+          <h1 data-i18n="options.title"></h1>
+          <p class="subtitle" data-i18n="options.subtitle"></p>
+        </div>
+      </div>
+    </header>
+
+    <section>
+      <h2><span data-icon="sliders" data-icon-size="16"></span><span data-i18n="setup.provider"></span></h2>
+      <div id="setup-form"></div>
+      <details class="subscription-note">
+        <summary data-i18n="setup.subscriptionQ"></summary>
+        <p>Anthropic subscriptions authenticate claude.ai and Claude Code only. Third-party apps — including this one — must use an <strong>API key</strong> from the Anthropic Console, which is billed separately from a Pro/Max plan. There is no supported way for an extension to spend a subscription, and any tool that claims to do so is reusing your browser session credentials in a way that risks your account.</p>
+        <p>Cheapest ways to run this extension: <strong>Gemini 2.5 Flash</strong> (generous free tier), or <strong>Ollama</strong> running locally for free — pick "OpenAI-compatible" with base URL <code>http://localhost:11434/v1</code>.</p>
+      </details>
+    </section>
+
+    <section>
+      <h2><span data-icon="gauge" data-icon-size="16"></span><span data-i18n="options.behavior"></span></h2>
+
+      <div class="field">
+        <label for="language" data-i18n="options.language"></label>
+        <select id="language"></select>
+        <p class="hint" data-i18n="options.languageHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="speakAnswers" data-i18n="options.voice"></label>
+        <select id="speakAnswers">
+          <option value="off" data-i18n="options.voiceOff"></option>
+          <option value="on" data-i18n="options.voiceOn"></option>
+        </select>
+        <p class="hint" data-i18n="options.voiceHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="voiceUri" data-i18n="options.voicePick"></label>
+        <select id="voiceUri"></select>
+      </div>
+
+      <div class="field">
+        <label for="voiceRate" data-i18n="options.voiceRate"></label>
+        <input type="range" id="voiceRate" min="0.5" max="2" step="0.1" />
+        <button id="voice-preview" class="ghost" data-icon="volumeOn" data-i18n-title="options.voicePreview"></button>
+      </div>
+
+      <div class="field">
+        <label for="planMode" data-i18n="options.planMode"></label>
+        <select id="planMode">
+          <option value="auto" data-i18n="options.planAuto"></option>
+          <option value="on" data-i18n="options.planOn"></option>
+          <option value="off" data-i18n="options.planOff"></option>
+        </select>
+        <p class="hint" data-i18n="options.planHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="streaming" data-i18n="options.streaming"></label>
+        <select id="streaming">
+          <option value="on" data-i18n="options.streamingOn"></option>
+          <option value="off" data-i18n="options.streamingOff"></option>
+        </select>
+        <p class="hint" data-i18n="options.streamingHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="currency" data-i18n="options.currency"></label>
+        <select id="currency">
+          <option value="USD">USD ($)</option>
+          <option value="SAR">SAR (ريال)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="budgetUsd" data-i18n="options.budget"></label>
+        <input type="number" id="budgetUsd" min="0" step="0.05" placeholder="0" />
+        <p class="hint" data-i18n="options.budgetHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="cdpMode" data-i18n="options.cdp"></label>
+        <select id="cdpMode">
+          <option value="auto" data-i18n="options.cdpAuto"></option>
+          <option value="on" data-i18n="options.cdpOn"></option>
+          <option value="off" data-i18n="options.cdpOff"></option>
+        </select>
+        <p class="hint" data-i18n="options.cdpHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="customInstructions" data-i18n="options.customInstructions"></label>
+        <textarea id="customInstructions" rows="5" data-i18n-placeholder="options.customInstructionsPlaceholder"></textarea>
+        <p class="hint" data-i18n="options.customInstructionsHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="maxSteps" data-i18n="options.maxSteps"></label>
+        <input type="number" id="maxSteps" min="5" max="100" step="5" />
+        <p class="hint" data-i18n="options.maxStepsHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="keepScreenshots" data-i18n="options.keepScreenshots"></label>
+        <input type="number" id="keepScreenshots" min="0" max="6" />
+        <p class="hint" data-i18n="options.keepScreenshotsHint"></p>
+      </div>
+
+      <div class="field">
+        <label for="approvalMode" data-i18n="options.approval"></label>
+        <select id="approvalMode">
+          <option value="auto" data-i18n="options.approvalAuto"></option>
+          <option value="ask" data-i18n="options.approvalAsk"></option>
+        </select>
+      </div>
+
+      <div class="setup-actions">
+        <button id="save-behavior" class="primary" data-i18n="options.saveBehavior"></button>
+        <span id="behavior-status" class="setup-status"></span>
+      </div>
+    </section>
+
+    <section class="danger-zone">
+      <h2><span data-icon="trash" data-icon-size="16"></span><span data-i18n="options.data"></span></h2>
+      <p class="hint" data-i18n="options.dataHint"></p>
+      <button id="clear-all" class="ghost" data-i18n="options.eraseAll"></button>
+      <span id="clear-status" class="setup-status"></span>
+    </section>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

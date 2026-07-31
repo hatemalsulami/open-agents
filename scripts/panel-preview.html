@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Panel preview</title>
+  <link rel="stylesheet" href="../sidepanel/panel.css" />
+  <style>
+    body { width: 400px; margin: 0 auto; border-inline: 1px solid var(--border); }
+    #log { font-family: ui-monospace, monospace; font-size: 11px; padding: 8px; }
+    .pass { color: var(--ok); } .fail { color: var(--err); font-weight: 700; }
+  </style>
+</head>
+<head></head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo" data-icon="sparkle" data-icon-size="17"></span>
+      <button id="model-badge" class="badge">claude-sonnet-5</button>
+    </div>
+    <div class="header-actions">
+      <button id="toggle-voice" class="tab-btn" data-icon="volumeOff" title="Read aloud"></button>
+      <button id="toggle-lang" class="tab-btn lang-btn" title="Language">ع</button>
+      <button id="open-dashboard" class="tab-btn" data-icon="gauge" title="Dashboard"></button>
+      <button id="toggle-setup" class="tab-btn" data-icon="sliders" title="Setup"></button>
+    </div>
+  </header>
+
+  <nav id="main-nav">
+    <button class="nav-tab active" data-icon="chat"><span>Agents</span></button>
+    <button class="nav-tab" data-icon="board"><span>Board</span></button>
+    <button class="nav-tab" data-icon="clock"><span>Routines</span></button>
+    <button class="nav-tab" data-icon="book"><span>Knowledge</span></button>
+  </nav>
+
+  <nav id="session-bar">
+    <div id="session-chips">
+      <div class="chip active"><span class="status-dot running"></span><span class="chip-title">Update sheet tabs</span><span class="chip-close" data-icon="x" data-icon-size="12"></span></div>
+      <div class="chip"><span class="status-dot"></span><span class="chip-title">Compare prices</span><span class="chip-close" data-icon="x" data-icon-size="12"></span></div>
+    </div>
+    <button class="icon-btn" data-icon="plus" title="New agent"></button>
+    <button class="icon-btn" data-icon="download" title="Export"></button>
+    <button class="icon-btn" data-icon="braces" title="JSON"></button>
+  </nav>
+
+  <main id="chat-view">
+    <div id="messages"></div>
+  </main>
+
+  <footer id="composer-footer">
+    <div class="composer-wrap">
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Tell me what to do…  (type @ to mention a tab)"></textarea>
+        <button class="primary send-btn" data-icon="send" title="Send"></button>
+      </div>
+    </div>
+  </footer>
+
+  <div id="log"></div>
+
+  <script type="module">
+    import { applyIcons, icon } from '../ui/icons.js';
+
+    // Build the real empty state markup the panel produces.
+    const messages = document.getElementById('messages');
+    const wrap = document.createElement('div');
+    wrap.className = 'empty-state';
+    const mark = document.createElement('div');
+    mark.className = 'empty-mark';
+    mark.appendChild(icon('sparkle', { size: 26 }));
+    const title = document.createElement('div');
+    title.className = 't';
+    title.textContent = 'Tell me what to do in your browser';
+    const hint = document.createElement('div');
+    hint.className = 'h';
+    hint.textContent = 'I can read pages, click, type, fill forms, compare tabs and report back — describe the outcome you want, not the clicks.';
+    wrap.append(mark, title, hint);
+
+    const examples = document.createElement('div');
+    examples.className = 'examples';
+    for (const text of [
+      'Summarize this page in 5 bullet points',
+      'Find the 3 best-rated options here and compare price, rating and delivery',
+      'Pull every product name and price on this page into a table',
+      'Open the top 3 search results and tell me which is most relevant',
+    ]) {
+      const chip = document.createElement('button');
+      chip.className = 'example-chip';
+      chip.textContent = text;
+      examples.appendChild(chip);
+    }
+    wrap.appendChild(examples);
+    const tip = document.createElement('div');
+    tip.className = 'h small';
+    tip.textContent = 'Type @ to point me at specific tabs, or open the Board to watch several agents at once.';
+    wrap.appendChild(tip);
+    messages.appendChild(wrap);
+
+    applyIcons();
+
+    // Assertions: icons rendered, and labels survived the icon pass.
+    const log = document.getElementById('log');
+    let failures = 0;
+    const check = (name, ok, detail = '') => {
+      failures += ok ? 0 : 1;
+      const line = document.createElement('div');
+      line.className = ok ? 'pass' : 'fail';
+      line.textContent = `${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`;
+      log.appendChild(line);
+    };
+
+    const tabs = [...document.querySelectorAll('.nav-tab')];
+    check('every nav tab has an svg icon', tabs.every((b) => b.querySelector('svg.icon')));
+    check('nav labels survived applyIcons', tabs.every((b) => b.querySelector('span')?.textContent),
+      tabs.map((b) => b.querySelector('span').textContent).join(', '));
+    check('icon comes before the label', tabs.every((b) => b.firstElementChild.tagName.toLowerCase() === 'svg'));
+
+    applyIcons(); // second pass must not duplicate
+    check('applyIcons is idempotent', tabs.every((b) => b.querySelectorAll('svg.icon').length === 1),
+      `svgs per tab: ${tabs.map((b) => b.querySelectorAll('svg.icon').length).join(',')}`);
+
+    check('header buttons have icons', [...document.querySelectorAll('.header-actions .tab-btn[data-icon]')].every((b) => b.querySelector('svg')));
+    // Scan the app chrome only — the assertion log itself contains ✓/✗ marks.
+    const chromeText = [...document.querySelectorAll('header, #main-nav, #session-bar, #messages, footer')]
+      .map((el) => el.innerText).join(' ');
+    check('no emoji left in the chrome', !/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(chromeText),
+      chromeText.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u)?.[0] || 'clean');
+    check('example prompts rendered', document.querySelectorAll('.example-chip').length === 4);
+    check('icons inherit currentColor', getComputedStyle(document.querySelector('.nav-tab.active svg')).stroke !== 'none');
+
+    const summary = document.createElement('div');
+    summary.className = failures ? 'fail' : 'pass';
+    summary.textContent = failures ? `${failures} FAILED` : 'ALL PASSED';
+    log.appendChild(summary);
+  </script>
+</body>
+</html>
