@@ -96,6 +96,9 @@ async function runTask(session, text, { tabId, notifyOnDone = false, mentions = 
     return;
   }
 
+  session.maybeAutoTitle(text);
+  emitTo(session, { kind: 'user', text });
+
   let config, provider;
   try {
     config = await loadConfig();
@@ -106,8 +109,6 @@ async function runTask(session, text, { tabId, notifyOnDone = false, mentions = 
     setStatus(session, 'error');
     return;
   }
-
-  session.maybeAutoTitle(text);
 
   // Mentioned tabs define both the starting point and the boundary.
   const scope = createScope({ tabs: mentions, restrictOrigins });
@@ -128,7 +129,6 @@ async function runTask(session, text, { tabId, notifyOnDone = false, mentions = 
     `${text}\n\n[Browser context: ${await describeStartingTab(session.tabId)}]` +
     describeScopeForModel(scope);
   session.messages.push({ role: 'user', content: [{ type: 'text', text: situated }] });
-  emitTo(session, { kind: 'user', text });
   setStatus(session, 'running');
 
   const run = new AgentRun({

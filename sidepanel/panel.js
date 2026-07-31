@@ -513,19 +513,25 @@ async function send() {
 
   ui.input.value = '';
   autosize();
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  // First task of a session inherits the tab you're looking at; later ones stay
-  // in the tab that agent already owns. Mentioned tabs override both.
-  const isFirst = !(snapshots.get(activeId) || []).some((e) => e.kind === 'user');
-  post({
-    type: 'start',
-    sessionId: activeId,
-    text,
-    tabId: isFirst ? tab?.id : undefined,
-    mentions: mentionsCtl.getMentions(),
-    restrictOrigins: mentionsCtl.getRestrictOrigins(),
-  });
-  mentionsCtl.clear();
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    // First task of a session inherits the tab you're looking at; later ones stay
+    // in the tab that agent already owns. Mentioned tabs override both.
+    const isFirst = !(snapshots.get(activeId) || []).some((e) => e.kind === 'user');
+    post({
+      type: 'start',
+      sessionId: activeId,
+      text,
+      tabId: isFirst ? tab?.id : undefined,
+      mentions: mentionsCtl.getMentions(),
+      restrictOrigins: mentionsCtl.getRestrictOrigins(),
+    });
+    mentionsCtl.clear();
+  } catch (err) {
+    ui.input.value = text;
+    autosize();
+    console.error('Failed to start session:', err);
+  }
 }
 
 function autosize() {

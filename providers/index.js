@@ -186,5 +186,7 @@ export async function apiError(providerId, response) {
     advice = `${label} is having server trouble. This is on their side — retry shortly.`;
   }
 
-  return new Error(advice ? `${advice}\n\n(${label}: ${raw})` : `${label} API error: ${raw}`);
+  const err = new Error(advice ? `${advice}\n\n(${label}: ${raw})` : `${label} API error: ${raw}`);
+  err.status = response.status;
+  return err;
 }

@@ -187,26 +187,50 @@ export class AgentRun {
       if (this.flattensHistory) trimHistory(messages, this.historyTurns);
 
       let response;
-      // Deltas are batched before they hit the UI; emitting per token would
-      // flood the port and make the panel stutter.
       const streamId = `s${Date.now().toString(36)}${step}`;
-      const stream = this.streaming
-        ? createThrottledEmitter((chunk) => this.emit({ kind: 'assistant_delta', id: streamId, text: chunk }))
-        : null;
 
-      try {
-        response = await this.provider.chat({
-          system: this.system,
-          messages,
-          tools: this.tools,
-          signal: this.abortController.signal,
-          onDelta: stream ? (delta) => stream.push(delta) : undefined,
-        });
-        stream?.flush();
-      } catch (err) {
-        stream?.flush();
-        if (this.stopped) return finalText;
-        throw this.explainFailure(err);
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const stream = this.streaming
+          ? createThrottledEmitter((chunk) => this.emit({ kind: 'assistant_delta', id: streamId, text: chunk }))
+          : null;
+
+        try {
+          response = await this.provider.chat({
+            system: this.system,
+            messages,
+            tools: this.tools,
+            signal: this.abortController.signal,
+            onDelta: stream ? (delta) => stream.push(delta) : undefined,
+          });
+          stream?.flush();
+          break; // Success
+        } catch (err) {
+          stream?.flush();
+          if (this.stopped) return finalText;
+          
+          const isRetryable = (err.status === 429 || err.status === 503 || err.status === 529) && !err.message.includes('limit: 0');
+          if (isRetryable && attempt < 3) {
+            let waitSeconds = 15 * attempt;
+            const match = err.message.match(/retry in ([\d.]+)/i);
+            if (match) {
+              waitSeconds = Math.max(1, Math.min(60, parseFloat(match[1])));
+            }
+            this.emit({ kind: 'system', text: `Rate limit or server busy. Waiting ${Math.ceil(waitSeconds)} seconds before retrying...` });
+            
+            await new Promise((resolve) => {
+              const timeoutId = setTimeout(resolve, waitSeconds * 1000);
+              this.abortController.signal.addEventListener('abort', () => {
+                clearTimeout(timeoutId);
+                resolve();
+              }, { once: true });
+            });
+            
+            if (this.stopped) return finalText;
+            continue;
+          }
+          
+          throw this.explainFailure(err);
+        }
       }
 
       this.recordUsage(response);
