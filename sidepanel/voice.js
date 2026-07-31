@@ -50,13 +50,16 @@ export function createVoice() {
   }
 
   /** Best available voice: the user's pick, else one matching the UI language. */
-  function pickVoice(preferredUri, lang) {
+  function pickVoice(preferredUri, targetLang) {
     if (!voices.length) loadVoices();
+    const prefix = targetLang === 'ar' ? 'ar' : 'en';
+    
     if (preferredUri) {
       const chosen = voices.find((v) => v.voiceURI === preferredUri);
-      if (chosen) return chosen;
+      // Only use the preferred voice if it matches the detected language family
+      if (chosen && chosen.lang?.toLowerCase().startsWith(prefix)) return chosen;
     }
-    const prefix = lang === 'ar' ? 'ar' : 'en';
+    
     return (
       voices.find((v) => v.lang?.toLowerCase().startsWith(prefix) && v.localService) ||
       voices.find((v) => v.lang?.toLowerCase().startsWith(prefix)) ||
@@ -98,12 +101,17 @@ export function createVoice() {
 
       synth.cancel(); // never let two answers overlap
       const utterance = new SpeechSynthesisUtterance(text);
-      const voice = pickVoice(voiceUri, lang);
+      
+      // Auto-detect text language (English vs Arabic)
+      const hasArabic = /[\u0600-\u06FF]/.test(text);
+      const targetLang = hasArabic ? 'ar' : 'en';
+      
+      const voice = pickVoice(voiceUri, targetLang);
       if (voice) {
         utterance.voice = voice;
         utterance.lang = voice.lang;
       } else {
-        utterance.lang = lang === 'ar' ? 'ar-SA' : 'en-US';
+        utterance.lang = targetLang === 'ar' ? 'ar-SA' : 'en-US';
       }
       utterance.rate = Math.min(Math.max(Number(rate) || 1, 0.5), 2);
       synth.speak(utterance);

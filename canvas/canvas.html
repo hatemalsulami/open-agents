@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>OpenAgent Live Canvas</title>
+  <link rel="stylesheet" href="canvas.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo">✦</span>
+      <h1>Live Canvas (Easels)</h1>
+    </div>
+    <div class="actions">
+      <button id="synthesize-board" class="ghost" style="color: var(--accent); border-color: var(--accent);">
+        <span style="margin-right: 6px;">✦</span> Summarize Board
+      </button>
+      <button id="new-board" class="ghost">New Board</button>
+      <button id="add-manual" class="ghost">Add Widget</button>
+      <button id="delete-board" class="danger">Delete Board</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h3>Your Boards</h3>
+      <ul id="board-list">
+        <!-- Board list injected here -->
+      </ul>
+    </aside>
+
+    <main id="canvas-board">
+      <!-- Widgets will be injected here -->
+    </main>
+  </div>
+
+  <div id="add-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Add New Widget</h2>
+      <div class="field">
+        <label>Website URL</label>
+        <input type="text" id="widget-url" placeholder="https://news.ycombinator.com" />
+      </div>
+      <div class="field">
+        <label>CSS Selector to Extract</label>
+        <input type="text" id="widget-selector" placeholder=".hnmain, .news-list" />
+      </div>
+      <div class="field">
+        <label>Title (Optional)</label>
+        <input type="text" id="widget-title" placeholder="Hacker News Top" />
+      </div>
+      <div class="modal-actions">
+        <button id="save-widget" class="primary">Add to Canvas</button>
+        <button id="close-modal" class="ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="canvas.js"></script>
+</body>
+</html>

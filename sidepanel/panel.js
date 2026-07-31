@@ -36,6 +36,7 @@ const ui = {
   chips: $('session-chips'),
   input: $('input'),
   send: $('send-btn'),
+  dictate: $('dictate-btn'),
   stop: $('stop-btn'),
   statusBar: $('status-bar'),
   statusText: $('status-text'),
@@ -155,6 +156,17 @@ function onMessage(msg) {
       $('r-status').textContent = msg.text;
       $('r-status').className = `setup-status ${msg.error ? 'err' : 'ok'}`;
       break;
+
+    case 'session_lost': {
+      ui.input.value = msg.text;
+      autosize();
+      const err = document.createElement('div');
+      err.className = 'msg error';
+      err.textContent = 'Session lost due to browser inactivity. Please start a new agent.';
+      ui.messages.appendChild(err);
+      scrollToBottom();
+      break;
+    }
   }
 }
 
@@ -242,6 +254,8 @@ function renderTranscript() {
 
 async function renderEmptyState() {
   const problem = configProblem(await loadConfig());
+  if (ui.messages.children.length > 0) return; // Prevent duplicate empty states if rendering raced!
+  
   const wrap = document.createElement('div');
   wrap.className = 'empty-state';
 
@@ -284,7 +298,7 @@ async function renderEmptyState() {
     chip.addEventListener('click', () => {
       ui.input.value = t(key);
       autosize();
-      ui.input.focus();
+      send(); // Automatically send the prompt when clicked
     });
     examples.appendChild(chip);
   }
@@ -388,6 +402,29 @@ function appendEvent(event, autoScroll = true) {
         node = document.createElement('div');
         node.className = 'msg system';
         node.textContent = t('msg.stopped');
+      } else {
+        const events = snapshots.get(activeId) || [];
+        const toolCalls = events.filter(e => e.kind === 'tool' && e.call).map(e => e.call);
+        if (toolCalls.length > 0) {
+          node = document.createElement('div');
+          node.className = 'msg system';
+          
+          const saveBtn = document.createElement('button');
+          saveBtn.className = 'ghost small';
+          saveBtn.textContent = 'Save as Macro (Free Replay)';
+          saveBtn.addEventListener('click', () => {
+             const name = prompt('Name this macro:');
+             if (name) {
+               post({
+                 type: 'routine_save',
+                 routine: { name, prompt: 'Macro Execution', macroSteps: toolCalls }
+               });
+               saveBtn.textContent = 'Macro Saved!';
+               saveBtn.disabled = true;
+             }
+          });
+          node.appendChild(saveBtn);
+        }
       }
       break;
 
@@ -505,18 +542,25 @@ function scrollToBottom() {
 
 // ------------------------------------------------------------------ actions
 
+let isStarting = false;
+
 async function send() {
   const text = ui.input.value.trim();
-  if (!text || !activeId) return;
+  if (!text || !activeId || isStarting) return;
   const session = activeSession();
   if (session?.status === 'running' || session?.status === 'waiting') return;
 
-  ui.input.value = '';
-  autosize();
+  isStarting = true;
+  ui.input.disabled = true;
+  ui.send.disabled = true;
+
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    // First task of a session inherits the tab you're looking at; later ones stay
-    // in the tab that agent already owns. Mentioned tabs override both.
+    
+    // Only clear input after async operations that could fail
+    ui.input.value = '';
+    autosize();
+    
     const isFirst = !(snapshots.get(activeId) || []).some((e) => e.kind === 'user');
     post({
       type: 'start',
@@ -531,6 +575,11 @@ async function send() {
     ui.input.value = text;
     autosize();
     console.error('Failed to start session:', err);
+  } finally {
+    isStarting = false;
+    ui.input.disabled = false;
+    ui.send.disabled = false;
+    ui.input.focus();
   }
 }
 
@@ -700,8 +749,28 @@ $('deny-btn').addEventListener('click', () => {
 });
 
 $('new-session').addEventListener('click', () => post({ type: 'create_session' }));
-$('toggle-setup').addEventListener('click', () => toggleSetup());
-$('open-dashboard').addEventListener('click', () => chrome.runtime.openOptionsPage());
+
+  $('open-dashboard').addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
+  
+  $('open-canvas').addEventListener('click', () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL('canvas/canvas.html') });
+  });
+
+  $('snip-element').addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && !tab.url.startsWith('chrome://')) {
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content/content-script.js']
+      }).then(() => {
+        chrome.tabs.sendMessage(tab.id, { __openAgent: true, name: 'start_snipping' });
+      }).catch(err => {
+        console.warn('Could not inject snipper:', err);
+      });
+    }
+  });
 $('setup-dashboard').addEventListener('click', () => chrome.runtime.openOptionsPage());
 $('close-setup').addEventListener('click', () => toggleSetup(false));
 ui.badge.addEventListener('click', () => toggleSetup(true));
@@ -753,11 +822,7 @@ $('r-save').addEventListener('click', () => {
   $('r-status').className = 'setup-status ok';
 });
 
-// Export menu lives on the chat view header via keyboard-free UI: a long-press
-// free approach — an explicit button pair added to the session bar.
-const exportHtmlBtn = iconButton('download', t('session.export'), () => requestExport('html'));
-const exportJsonBtn = iconButton('braces', t('session.exportJson'), () => requestExport('json'));
-$('session-bar').append(exportHtmlBtn, exportJsonBtn);
+// -------------------------------------------------------------------- setup
 
 async function applyStoredLanguage() {
   const config = await loadConfig();
@@ -795,21 +860,7 @@ function renderVoiceButton() {
   if (!voice.supported) button.title = t('voice.unsupported');
 }
 
-$('toggle-voice').addEventListener('click', async () => {
-  const config = await loadConfig();
-  const next = !config.speakAnswers;
-  voice.stop();
-  await chrome.storage.local.set({ config: { ...config, speakAnswers: next } });
-  voiceConfig = { ...voiceConfig, speakAnswers: next };
-  renderVoiceButton();
-});
-
-$('toggle-lang').addEventListener('click', async () => {
-  const config = await loadConfig();
-  const next = getLanguage() === 'ar' ? 'en' : 'ar';
-  await chrome.storage.local.set({ config: { ...config, language: next } });
-  await applyStoredLanguage();
-});
+// Header buttons were moved to the dashboard.
 
 chrome.storage.onChanged.addListener((changes) => {
   if (!changes.config) return;
@@ -829,3 +880,50 @@ connect();
 applyStoredLanguage();
 syncRoutineFields();
 ui.input.focus();
+
+// ----------------------------------------------------------- voice input
+
+if ('webkitSpeechRecognition' in window) {
+  const recognition = new webkitSpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  
+  let isRecording = false;
+  
+  ui.dictate.addEventListener('click', () => {
+    if (isRecording) {
+      recognition.stop();
+      return;
+    }
+    
+    recognition.lang = getLanguage() || 'en-US';
+    recognition.start();
+    isRecording = true;
+    ui.dictate.classList.add('active');
+    ui.dictate.style.color = 'var(--err)'; // Red when recording
+  });
+  
+  recognition.onresult = (event) => {
+    let transcript = '';
+    for (let i = 0; i < event.results.length; ++i) {
+      transcript += event.results[i][0].transcript;
+    }
+    ui.input.value = transcript;
+    autosize();
+  };
+  
+  recognition.onend = () => {
+    isRecording = false;
+    ui.dictate.classList.remove('active');
+    ui.dictate.style.color = '';
+  };
+  
+  recognition.onerror = (event) => {
+    isRecording = false;
+    ui.dictate.classList.remove('active');
+    ui.dictate.style.color = '';
+    console.error('Speech recognition error', event.error);
+  };
+} else {
+  ui.dictate.classList.add('hidden');
+}

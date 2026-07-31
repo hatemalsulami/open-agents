@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- SEO & Meta Tags -->
+  <title>OpenAgent | أوبن إيجنت</title>
+  <meta name="description" content="OpenAgent is your intelligent browser assistant. Automate tasks, build live dashboards, custom themes, and AI summaries. / أوبن إيجنت هو مساعدك الذكي للمتصفح. أتمتة المهام، بناء لوحات معلومات، وتصميم الويب.">
+  <meta name="keywords" content="OpenAgent, AI, Chrome Extension, Web Automation, أوبن إيجنت, ذكاء اصطناعي, متصفح, أتمتة">
+  <meta name="author" content="Hatem">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:title" content="OpenAgent - The AI Web OS | نظام تشغيل الذكاء الاصطناعي">
+  <meta property="og:description" content="Automate tasks and build live dashboards using natural language. / أتمتة المهام وبناء لوحات بيانات حية باستخدام لغتك الطبيعية فقط.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://github.com/hatemalsulami/open-agents">
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="../icons/icon32.png">
+
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Language Toggle Styles */
+    body.lang-en .ar { display: none !important; }
+    body.lang-ar .en { display: none !important; }
+
+    /* Font rules based on language */
+    body.lang-ar, body.lang-ar h1, body.lang-ar h2, body.lang-ar h3, body.lang-ar .nav-links, body.lang-ar .btn-primary, body.lang-ar .btn-secondary, body.lang-ar p {
+      font-family: 'Tajawal', 'Inter', sans-serif !important;
+    }
+    body.lang-en, body.lang-en p, body.lang-en .nav-links, body.lang-en .btn-primary, body.lang-en .btn-secondary {
+      font-family: 'Inter', sans-serif !important;
+    }
+    body.lang-en h1, body.lang-en h2, body.lang-en h3, body.lang-en .logo, body.lang-en .badge {
+      font-family: 'Outfit', sans-serif !important;
+    }
+
+    /* Directional fixes */
+    .hero-actions { flex-direction: row; }
+    body.lang-ar .split-section { direction: rtl; }
+    body.lang-ar .split-visual { direction: ltr; }
+    body.lang-en .split-section { direction: ltr; }
+    body.lang-ar .icon-wrapper i { transform: scaleX(-1); }
+
+    /* Lang Toggle Button */
+    .lang-toggle {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 99px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.3s;
+      margin: 0 15px;
+    }
+    .lang-toggle:hover { background: rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body class="lang-ar">
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="logo">
+      <img src="../icons/icon128.png" width="32" height="32" alt="OpenAgent Logo" style="border-radius: 8px;">
+      <span class="ar">أوبن إيجنت</span><span class="en">OpenAgent</span>
+    </div>
+    <div class="nav-links">
+      <a href="#features"><span class="ar">المميزات</span><span class="en">Features</span></a>
+      <a href="#canvas"><span class="ar">اللوحة التفاعلية</span><span class="en">Live Canvas</span></a>
+      <a href="#zen"><span class="ar">وضع التركيز</span><span class="en">Zen Mode</span></a>
+      <button id="lang-btn" class="lang-toggle">English</button>
+      <a href="https://github.com/hatemalsulami/open-agents" target="_blank" class="btn-primary">
+        <span class="ar">عرض على GitHub</span><span class="en">View on GitHub</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="badge">
+        <span class="ar">الذكاء الاصطناعي مفتوح المصدر للويب</span><span class="en">Open Source Web AI</span>
+      </div>
+      <h1>
+        <span class="ar">أعد كتابة الإنترنت مع <span class="gradient-text">أوبن إيجنت</span>.</span>
+        <span class="en">Rewrite the Internet with <span class="gradient-text">OpenAgent</span>.</span>
+      </h1>
+      <p>
+        <span class="ar">مساعدك الذكي والمستقل للمتصفح. اطلب من أوبن إيجنت أتمتة المهام، وبناء لوحات بيانات مخصصة، واستخراج البيانات، وإعادة تصميم الويب بالكامل باستخدام لغتك الطبيعية.</span>
+        <span class="en">Your intelligent, autonomous browser assistant. Tell OpenAgent to automate tasks, build custom dashboards, extract data, and completely re-theme the web using natural language.</span>
+      </p>
+      <div class="hero-actions">
+        <a href="https://github.com/hatemalsulami/open-agents" target="_blank" class="btn-primary large">
+          <span class="ar">إضافة إلى كروم - مجانًا</span><span class="en">Add to Chrome - It's Free</span>
+        </a>
+        <a href="#features" class="btn-secondary large">
+          <span class="ar">شاهد كيف يعمل</span><span class="en">See How it Works</span>
+        </a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="glow-orb"></div>
+      <img src="C:/Users/hatem/.gemini/antigravity/brain/85b11045-15ed-4750-8980-7a949ee52085/hero_image_1785534436668.png" alt="OpenAgent Interface" class="hero-image" />
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section id="features" class="features-section">
+    <div class="section-header">
+      <h2>
+        <span class="ar">الأعمدة الأربعة للتحكم بالويب</span><span class="en">Four Pillars of Web Mastery</span>
+      </h2>
+      <p>
+        <span class="ar">أكثر من مجرد روبوت محادثة بسيط. أوبن إيجنت يشكل تجربة التصفح الخاصة بك بشكل فعال.</span>
+        <span class="en">Go beyond a simple chatbot. OpenAgent actively shapes your browsing experience.</span>
+      </p>
+    </div>
+    
+    <div class="feature-grid">
+      <div class="feature-card glass">
+        <div class="icon-wrapper"><i data-lucide="bot"></i></div>
+        <h3><span class="ar">التصفح الذاتي (الوكيل)</span><span class="en">Autonomous Browsing</span></h3>
+        <p>
+          <span class="ar">اطلب من الوكيل "البحث عن أرخص رحلة طيران إلى طوكيو" وشاهده وهو يتنقل ويبحث وينقر بمفرده تمامًا.</span>
+          <span class="en">Tell the agent to "Find the cheapest flight to Tokyo" and watch it navigate, search, and click entirely on its own.</span>
+        </p>
+      </div>
+
+      <div class="feature-card glass">
+        <div class="icon-wrapper"><i data-lucide="palette"></i></div>
+        <h3><span class="ar">المُعدّل (السمات المخصصة)</span><span class="en">The Mutator (Themes)</span></h3>
+        <p>
+          <span class="ar">لا تعجبك ألوان الموقع؟ اطلب من أوبن إيجنت "تغيير هذا الموقع إلى الوضع الليلي مع نص أخضر نيون" وستستمر التغييرات إلى الأبد.</span>
+          <span class="en">Hate the colors of a website? Tell OpenAgent to "Make this site dark mode with neon green text" and the changes persist forever.</span>
+        </p>
+      </div>
+
+      <div class="feature-card glass">
+        <div class="icon-wrapper"><i data-lucide="layout-dashboard"></i></div>
+        <h3><span class="ar">المُلحن (اللوحة التفاعلية)</span><span class="en">The Composer (Easels)</span></h3>
+        <p>
+          <span class="ar">اقتطع الأدوات والرسوم البيانية وموجز الأخبار من أي موقع ويب وقم بتجميعها في لوحة معلومات مكانية خاصة بك يتم تحديثها تلقائيًا.</span>
+          <span class="en">Snip widgets, charts, and news feeds from any website and combine them into your own auto-updating spatial dashboard.</span>
+        </p>
+      </div>
+
+      <div class="feature-card glass">
+        <div class="icon-wrapper"><i data-lucide="book-open"></i></div>
+        <h3><span class="ar">المُبسّط (وضع التركيز)</span><span class="en">The Reducer (Zen Mode)</span></h3>
+        <p>
+          <span class="ar">قم بإزالة الإعلانات المزعجة والأشرطة الجانبية والنوافذ المنبثقة على الفور بنقرة واحدة، مع ترك نص جميل وسهل القراءة فقط.</span>
+          <span class="en">Instantly strip away annoying ads, sidebars, and popups with a single click, leaving only beautiful, readable text.</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Canvas Deep Dive -->
+  <section id="canvas" class="split-section">
+    <div class="split-content">
+      <h2>
+        <span class="ar">ابنِ لوحتك التفاعلية القصوى (<span class="gradient-text">Easels</span>)</span>
+        <span class="en">Build Your Ultimate <span class="gradient-text">Live Canvas</span></span>
+      </h2>
+      <p>
+        <span class="ar">لماذا تزور 10 مواقع كل صباح؟ يتيح لك أوبن إيجنت اقتطاع المكونات بصريًا من أي موقع ولصقها في لوحة موحدة.</span>
+        <span class="en">Why visit 10 websites every morning? OpenAgent lets you visually snip components from any site and paste them into a unified "Easel".</span>
+      </p>
+      <ul>
+        <li><i data-lucide="check-circle-2"></i> <span class="ar">بيانات حية من حساباتك المسجلة</span><span class="en">Real-time, logged-in data</span></li>
+        <li><i data-lucide="check-circle-2"></i> <span class="ar">أداة الاقتطاع المرئية بنقرة واحدة</span><span class="en">Point-and-click snipping tool</span></li>
+        <li><i data-lucide="check-circle-2"></i> <span class="ar">ملخصات "الموجز الصباحي" عبر الذكاء الاصطناعي</span><span class="en">AI "Morning Briefing" summaries</span></li>
+      </ul>
+    </div>
+    <div class="split-visual" style="direction: ltr;">
+      <img src="C:/Users/hatem/.gemini/antigravity/brain/85b11045-15ed-4750-8980-7a949ee52085/canvas_image_1785534446257.png" alt="Live Canvas Dashboard" class="glass-img" />
+    </div>
+  </section>
+
+  <!-- Zen Mode Deep Dive -->
+  <section id="zen" class="split-section">
+    <div class="split-content">
+      <h2>
+        <span class="ar">ركز مع <span class="gradient-text">وضع التركيز</span></span>
+        <span class="en">Focus with <span class="gradient-text">Zen Mode</span></span>
+      </h2>
+      <p>
+        <span class="ar">يمتلئ الويب الحديث بالنوافذ المنبثقة واللافتات والأشرطة الجانبية المزعجة. أوبن إيجنت يزيل الضوضاء على الفور.</span>
+        <span class="en">The modern web is filled with popups, banners, and aggressive sidebars. OpenAgent cuts through the noise instantly.</span>
+      </p>
+      <ul>
+        <li><i data-lucide="check-circle-2"></i> <span class="ar">الاستخراج من جانب العميل يمنع تتبع الإعلانات</span><span class="en">Client-side extraction prevents tracking</span></li>
+        <li><i data-lucide="check-circle-2"></i> <span class="ar">خطوط قراءة جميلة مدعومة بالوضع الليلي</span><span class="en">Beautiful typography and dark mode</span></li>
+        <li><i data-lucide="check-circle-2"></i> <span class="ar">تراكب آمن لا يكسر الموقع الأصلي</span><span class="en">Non-destructive shadow DOM overlay</span></li>
+      </ul>
+    </div>
+    <div class="split-visual" style="direction: ltr;">
+      <img src="C:/Users/hatem/.gemini/antigravity/brain/85b11045-15ed-4750-8980-7a949ee52085/zen_image_1785534787124.png" alt="Zen Mode Preview" class="glass-img" />
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="cta-box glass">
+      <h2>
+        <span class="ar">هل أنت مستعد للسيطرة على متصفحك؟</span><span class="en">Ready to take control of your browser?</span>
+      </h2>
+      <p>
+        <span class="ar">قم بتثبيت أوبن إيجنت اليوم واختبر الويب كما لم يحدث من قبل.</span><span class="en">Install OpenAgent today and experience the web like never before.</span>
+      </p>
+      <a href="https://github.com/hatemalsulami/open-agents" target="_blank" class="btn-primary large">
+        <span class="ar">ابدأ الآن على GitHub</span><span class="en">Get Started on GitHub</span>
+      </a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-content">
+      <div class="logo">
+        <img src="../icons/icon16.png" width="16" height="16" alt="OpenAgent Logo"> 
+        <span class="ar">أوبن إيجنت</span><span class="en">OpenAgent</span>
+      </div>
+      <p>
+        <span class="ar">&copy; 2026 نظام تشغيل أوبن إيجنت. تم بناؤه بواسطة حاتم.</span><span class="en">&copy; 2026 OpenAgent OS. Built by Hatem.</span>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+    
+    // Language Toggle Logic
+    const langBtn = document.getElementById('lang-btn');
+    langBtn.addEventListener('click', () => {
+      const isArabic = document.body.classList.contains('lang-ar');
+      if (isArabic) {
+        document.body.classList.remove('lang-ar');
+        document.body.classList.add('lang-en');
+        document.documentElement.dir = 'ltr';
+        document.documentElement.lang = 'en';
+        langBtn.textContent = 'عربي';
+      } else {
+        document.body.classList.remove('lang-en');
+        document.body.classList.add('lang-ar');
+        document.documentElement.dir = 'rtl';
+        document.documentElement.lang = 'ar';
+        langBtn.textContent = 'English';
+      }
+    });
+  </script>
+</body>
+</html>

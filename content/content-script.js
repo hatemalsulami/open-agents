@@ -241,8 +241,28 @@
 
   function getPageText(input = {}) {
     showActivity('Reading this page…', { scanning: true });
+    
+    // Readability heuristic: temporarily hide noisy elements to clean up innerText
+    const noisySelectors = ['nav', 'header', 'footer', 'aside', 'form', '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]', '.ad', '.ads', '.sidebar', '.menu'];
+    const hiddenElements = [];
+    
+    for (const selector of noisySelectors) {
+      document.querySelectorAll(selector).forEach(el => {
+        if (el.style.display !== 'none') {
+          hiddenElements.push({ el, origDisplay: el.style.display });
+          el.style.display = 'none';
+        }
+      });
+    }
+
     const root = document.querySelector('main, article, [role="main"]') || document.body;
     const text = (root.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+    
+    // Restore original visibility so the page doesn't break
+    for (const { el, origDisplay } of hiddenElements) {
+      el.style.display = origDisplay;
+    }
+
     const max = Math.max(400, Number(input.max_chars) || 20000);
     const header = `Page: ${truncate(document.title, 150)}\nURL: ${location.href}\n\n`;
     return header + (text.length > max ? text.slice(0, max) + `\n\n…truncated (${text.length} chars total)` : text);
@@ -455,6 +475,40 @@
     find: findElements,
     extract_links: extractLinks,
     read_section: readSection,
+    query_dom: (input) => {
+      const selector = String(input.selector || '').trim();
+      if (!selector) throw new Error('query_dom needs a "selector".');
+      showActivity(`Querying DOM for “${truncate(selector, 30)}”`, { scanning: true });
+      const limit = Math.min(Math.max(Number(input.limit) || 10, 1), 50);
+      
+      let elements;
+      try {
+        elements = document.querySelectorAll(selector);
+      } catch (e) {
+        throw new Error(`Invalid CSS selector: "${selector}"`);
+      }
+      
+      if (!elements.length) return `No elements found matching "${selector}".`;
+      
+      const results = [];
+      for (const el of elements) {
+        if (!isVisible(el)) continue;
+        const text = (el.innerText || '').replace(/\s+/g, ' ').trim();
+        if (text) {
+          let ref = null;
+          for (const [key, value] of state.refs) if (value === el) ref = key;
+          if (!ref) {
+            ref = `ref${++state.refCounter}`;
+            state.refs.set(ref, el);
+          }
+          results.push(`[${ref}] ${text}`);
+          if (results.length >= limit) break;
+        }
+      }
+      
+      if (!results.length) return `Elements matching "${selector}" were found, but they are all invisible or empty.`;
+      return `Results for "${selector}":\n${results.join('\n')}`;
+    },
     element_rect: elementRect,
 
     click: (input) => {
@@ -503,18 +557,320 @@
       pressKeyOn(document.activeElement || document.body, input.key);
       return `Pressed ${input.key}.`;
     },
+
+    fetch_api: async (input) => {
+      const url = String(input.url || '').trim();
+      if (!url) throw new Error('fetch_api needs a "url".');
+      showActivity(`Fetching API: ${truncate(url, 30)}`, { scanning: true });
+      
+      try {
+        const res = await fetch(url, {
+          method: input.method || 'GET',
+          headers: { 'Accept': 'application/json, text/plain, */*' }
+        });
+        if (!res.ok) return `HTTP Error: ${res.status} ${res.statusText}`;
+        const text = await res.text();
+        try {
+          const obj = JSON.parse(text);
+          return JSON.stringify(obj, null, 2);
+        } catch {
+          return text;
+        }
+      } catch (err) {
+        return `Fetch failed: ${err.message}`;
+      }
+    },
+
+    customize_page: async (input) => {
+      const hostname = location.hostname;
+      if (!hostname) throw new Error('Cannot customize this page (no hostname).');
+      
+      showActivity('Customizing page styling…', { scanning: true });
+      
+      const storageKey = `customizer_${hostname}`;
+      
+      if (input.clear) {
+        await chrome.storage.local.remove(storageKey);
+        return `Cleared all customizations for ${hostname}.`;
+      }
+      
+      // Fetch existing config so we don't overwrite unrelated fields (e.g., if we only want to change font)
+      const data = await chrome.storage.local.get([storageKey]);
+      const currentConfig = data[storageKey] || {};
+      
+      const nextConfig = {
+        theme: { ...(currentConfig.theme || {}), ...(input.theme || {}) },
+        hide_selectors: input.hide_selectors ? [...new Set([...(currentConfig.hide_selectors || []), ...input.hide_selectors])] : currentConfig.hide_selectors,
+        custom_css: input.custom_css || currentConfig.custom_css
+      };
+      
+      await chrome.storage.local.set({ [storageKey]: nextConfig });
+      return `Customization applied to ${hostname}. The page style has updated permanently.`;
+    },
+
+    extract_artifact: async (input) => {
+      const selector = String(input.selector || '').trim();
+      const title = String(input.title || '').trim();
+      const targetBoard = String(input.boardName || 'Default').trim();
+      if (!selector) throw new Error('extract_artifact needs a "selector".');
+      
+      showActivity(`Extracting “${truncate(title || selector, 30)}” to ${targetBoard} Canvas`, { scanning: true });
+      
+      // Verify the element exists
+      const element = document.querySelector(selector);
+      if (!element) {
+        throw new Error(`Could not find any element matching selector "${selector}" on this page.`);
+      }
+      
+      const STORAGE_KEY = 'canvas_boards';
+      const data = await chrome.storage.local.get(STORAGE_KEY);
+      const boards = data[STORAGE_KEY] || [];
+      
+      let board = boards.find(b => b.name === targetBoard);
+      if (!board) {
+        board = { id: 'board_' + Date.now(), name: targetBoard, widgets: [] };
+        boards.push(board);
+      }
+      
+      board.widgets.push({
+        url: location.href,
+        selector: selector,
+        title: title || document.title
+      });
+      
+      await chrome.storage.local.set({ [STORAGE_KEY]: boards });
+      
+      flashElement(element);
+      return `Successfully extracted the component to the "${targetBoard}" Canvas dashboard.`;
+    },
+
+    zen_mode: (input) => {
+      showActivity('Activating Zen Mode…', { scanning: true });
+      
+      // Heuristic: Find the main content
+      const root = document.querySelector('article, [role="main"]') || document.querySelector('main') || document.body;
+      
+      // Clone the root so we can strip noise without breaking the real page
+      const clone = root.cloneNode(true);
+      
+      // Strip noisy elements
+      const noisySelectors = ['nav', 'header', 'footer', 'aside', 'form', '[role="navigation"]', '[role="banner"]', '[role="contentinfo"]', '.ad', '.ads', '.sidebar', '.menu', 'script', 'style', 'iframe', '.comments'];
+      for (const selector of noisySelectors) {
+        clone.querySelectorAll(selector).forEach(el => el.remove());
+      }
+      
+      // Build Zen Overlay
+      const host = document.createElement('div');
+      host.id = '__openagent_zen_overlay';
+      host.style.cssText = 'all:initial; position:fixed; inset:0; z-index:2147483647; background: #fafafa; overflow-y:auto;';
+      
+      const shadow = host.attachShadow({ mode: 'closed' });
+      
+      const style = document.createElement('style');
+      style.textContent = `
+        :host {
+          font-family: -apple-system, BlinkMacSystemFont, "Georgia", serif;
+          color: #333;
+          line-height: 1.6;
+        }
+        .zen-container {
+          max-width: 700px;
+          margin: 0 auto;
+          padding: 60px 20px;
+          font-size: 19px;
+        }
+        .zen-container h1 { font-size: 32px; line-height: 1.2; margin-bottom: 30px; font-weight: 700; font-family: -apple-system, sans-serif; letter-spacing:-0.5px; }
+        .zen-container h2 { font-size: 24px; margin-top: 40px; margin-bottom: 20px; font-weight: 600; font-family: -apple-system, sans-serif; }
+        .zen-container h3 { font-size: 20px; margin-top: 30px; font-family: -apple-system, sans-serif; }
+        .zen-container p { margin-bottom: 24px; color: #1f1f1f; letter-spacing: 0.1px; }
+        .zen-container img, .zen-container picture, .zen-container video {
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          margin: 30px 0;
+          display: block;
+        }
+        .zen-container a { color: #7c6cf5; text-decoration: none; }
+        .zen-container a:hover { text-decoration: underline; }
+        .zen-container blockquote {
+          border-left: 4px solid #7c6cf5;
+          margin: 0;
+          padding-left: 20px;
+          font-style: italic;
+          color: #555;
+        }
+        .close-btn {
+          position: fixed;
+          top: 20px;
+          right: 30px;
+          background: rgba(0,0,0,0.05);
+          border: none;
+          padding: 10px 16px;
+          border-radius: 99px;
+          font-family: -apple-system, sans-serif;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          color: #555;
+          transition: all 0.2s;
+        }
+        .close-btn:hover { background: rgba(0,0,0,0.1); color: #000; }
+        
+        @media (prefers-color-scheme: dark) {
+          :host { background: #111; color: #eee; }
+          .zen-container p { color: #d0d0d0; }
+          .zen-container blockquote { color: #aaa; }
+          .close-btn { background: rgba(255,255,255,0.1); color: #eee; }
+          .close-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+        }
+      `;
+      
+      const container = document.createElement('div');
+      container.className = 'zen-container';
+      
+      const title = document.createElement('h1');
+      title.textContent = document.title;
+      container.appendChild(title);
+      
+      const content = document.createElement('div');
+      // Using innerHTML from the cleaned clone is relatively safe here since it's just a reader view
+      // of the same page's DOM, and it's isolated in shadow DOM. 
+      // But to be completely safe, we could walk and only append text and safe tags. 
+      // For simplicity in a reader mode, we append the sanitized clone.
+      content.appendChild(clone);
+      container.appendChild(content);
+      
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'close-btn';
+      closeBtn.textContent = '✕ Close Zen Mode';
+      closeBtn.onclick = () => host.remove();
+      
+      shadow.appendChild(style);
+      shadow.appendChild(closeBtn);
+      shadow.appendChild(container);
+      
+      document.documentElement.appendChild(host);
+      
+      return 'Zen Mode activated successfully. The page is now clutter-free.';
+    },
+    
+    start_snipping: () => {
+      if (document.getElementById('openagent-snipper-overlay')) return 'Already snipping';
+      
+      const overlay = document.createElement('div');
+      overlay.id = 'openagent-snipper-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;cursor:crosshair;';
+      
+      const highlight = document.createElement('div');
+      highlight.style.cssText = 'position:fixed;pointer-events:none;border:3px dashed #7c6cf5;background:rgba(124,108,245,0.15);transition:all 0.1s ease;display:none;';
+      overlay.appendChild(highlight);
+      
+      const badge = document.createElement('div');
+      badge.style.cssText = 'position:absolute;bottom:-30px;right:0;background:#7c6cf5;color:#fff;padding:4px 8px;font-size:12px;border-radius:4px;font-family:sans-serif;white-space:nowrap;';
+      highlight.appendChild(badge);
+      
+      document.body.appendChild(overlay);
+      
+      let currentTarget = null;
+      
+      function getSelector(el) {
+        if (el.id) return '#' + el.id;
+        if (el.tagName === 'BODY') return 'body';
+        let sel = el.tagName.toLowerCase();
+        if (el.className && typeof el.className === 'string') {
+          const classes = el.className.trim().split(/\s+/).filter(c => !c.startsWith('openagent-') && c.length > 0);
+          if (classes.length > 0) sel += '.' + classes.join('.');
+        }
+        return sel;
+      }
+      
+      const mouseMoveHandler = (e) => {
+        if (e.target.closest('#openagent-snipper-overlay')) return;
+        const target = e.target;
+        if (target === currentTarget) return;
+        currentTarget = target;
+        
+        const rect = target.getBoundingClientRect();
+        highlight.style.display = 'block';
+        highlight.style.top = rect.top + 'px';
+        highlight.style.left = rect.left + 'px';
+        highlight.style.width = rect.width + 'px';
+        highlight.style.height = rect.height + 'px';
+        badge.textContent = getSelector(target);
+      };
+      
+      const clickHandler = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const selector = getSelector(e.target);
+        cleanup();
+        
+        const boardName = prompt('Snip successful! Which Canvas Board would you like to save this to?', 'Default');
+        if (boardName) {
+          const STORAGE_KEY = 'canvas_boards';
+          const data = await chrome.storage.local.get(STORAGE_KEY);
+          const boards = data[STORAGE_KEY] || [];
+          
+          let board = boards.find(b => b.name === boardName.trim());
+          if (!board) {
+            board = { id: 'board_' + Date.now(), name: boardName.trim(), widgets: [] };
+            boards.push(board);
+          }
+          
+          board.widgets.push({
+            url: location.href,
+            selector: selector,
+            title: document.title
+          });
+          
+          await chrome.storage.local.set({ [STORAGE_KEY]: boards });
+          alert(`Saved to ${boardName} Canvas!`);
+        }
+      };
+      
+      const keydownHandler = (e) => {
+        if (e.key === 'Escape') cleanup();
+      };
+      
+      function cleanup() {
+        document.removeEventListener('mousemove', mouseMoveHandler, true);
+        document.removeEventListener('click', clickHandler, true);
+        document.removeEventListener('keydown', keydownHandler, true);
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        document.body.style.cursor = 'default';
+      }
+      
+      document.addEventListener('mousemove', mouseMoveHandler, true);
+      document.addEventListener('click', clickHandler, true);
+      document.addEventListener('keydown', keydownHandler, true);
+      document.body.style.cursor = 'crosshair';
+      
+      return 'Snipping mode started';
+    },
   };
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!msg || msg.__openAgent !== true) return false;
+    
+    const handler = handlers[msg.name];
+    if (!handler) {
+      sendResponse({ ok: false, error: `Unknown page tool: ${msg.name}` });
+      return false;
+    }
+    
     try {
-      const handler = handlers[msg.name];
-      if (!handler) throw new Error(`Unknown page tool: ${msg.name}`);
       const result = handler(msg.input || {});
+      if (result instanceof Promise) {
+        result
+          .then(res => sendResponse({ ok: true, result: res }))
+          .catch(err => sendResponse({ ok: false, error: err?.message || String(err) }));
+        return true; // Keep message channel open for async response
+      }
       sendResponse({ ok: true, result });
     } catch (err) {
       sendResponse({ ok: false, error: err?.message || String(err) });
     }
-    return false; // all handlers are synchronous
+    return false;
   });
 })();

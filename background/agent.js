@@ -22,8 +22,13 @@ WHERE YOU ARE
 - Chrome's internal pages (chrome://, the Web Store) are off limits.
 
 ANSWER DIRECTLY WHEN NO BROWSING IS NEEDED
-- If the user greets you, thanks you, asks what you can do, or asks something you already know, just reply. Do NOT open a browser tab for it.
-- Only use tools when the task genuinely needs a live page.
+- If the user greets you, thanks you, asks what you can do, or asks something you already know, just reply directly with a clear, concise answer. Do NOT open a browser tab for it.
+- If the user asks what you can do, clearly list your core capabilities:
+  1. **Autonomous Browsing**: You can search the web, read articles, extract data, and fill out forms.
+  2. **The Mutator (Custom Themes)**: You can permanently rewrite the aesthetic of any website (colors, fonts, hiding elements) using the \`customize_page\` tool.
+  3. **The Composer (Live Canvas)**: You can snip any widget from any website using \`extract_artifact\` and compose them into live, auto-updating dashboards (Easels). You can also open the canvas using \`open_canvas\`.
+  4. **The Reducer (Zen Mode)**: You can instantly strip away ads and noise from any article to create a beautiful reading overlay using \`zen_mode\`.
+- Only use tools when the task genuinely needs a live page or action.
 
 READING PAGES WITHOUT WASTING CONTEXT — THIS MATTERS MOST
 - find("search box") / find("sign in button") → returns just the few matching elements with [refN] ids. This is the DEFAULT way to locate something.
@@ -69,8 +74,75 @@ const LANGUAGE_INSTRUCTIONS = {
   en: '',
 };
 
-function buildSystemPrompt(config) {
+const PLATFORM_PLAYBOOKS = [
+  {
+    match: (url) => url.includes('docs.google.com/spreadsheets'),
+    playbook: `\n\nPLATFORM PLAYBOOK: GOOGLE SHEETS
+- Google Sheets renders its grid using an HTML <canvas>. You CANNOT read the cell data from the DOM or using get_page_text.
+- To find things, rely on the search bar or use Google Sheets keyboard shortcuts (like Ctrl+F).
+- To read the whole sheet, the best approach is to navigate to File -> Download -> Comma Separated Values (.csv), then read the downloaded file.
+- Do not waste time trying to read_section on the grid itself.`
+  },
+  {
+    match: (url) => url.includes('docs.google.com/document'),
+    playbook: `\n\nPLATFORM PLAYBOOK: GOOGLE DOCS
+- Google Docs renders text using an HTML <canvas>. You CANNOT read the document directly from the DOM using read_page or get_page_text.
+- To read the document, navigate to File -> Download -> Plain Text (.txt) and read the downloaded file, or use Select All.
+- Do not waste time trying to read_section on the document canvas itself.`
+  },
+  {
+    match: (url) => url.includes('amazon.'),
+    playbook: `\n\nPLATFORM PLAYBOOK: AMAZON
+- Amazon's DOM is massive. Avoid read_page at all costs as it will exceed context limits.
+- Use find() to locate the search bar, "Add to Cart", or specific product details.
+- Reviews and specifications are often hidden behind "See more" or "Read more" buttons. Click these before trying to extract text.`
+  },
+  {
+    match: (url) => url.includes('github.com'),
+    playbook: `\n\nPLATFORM PLAYBOOK: GITHUB
+- GitHub heavily uses single-page application routing. Clicking a link updates the page without a full reload.
+- If you click a file to view it, make sure to look for the "Raw" button if you want to read the code easily without syntax highlighting noise.`
+  },
+  {
+    match: (url) => url.includes('linkedin.com'),
+    playbook: `\n\nPLATFORM PLAYBOOK: LINKEDIN
+- LinkedIn has massive DOM sizes. Do NOT use read_page.
+- Experience sections, about sections, and job descriptions are usually collapsed. Use find("see more") or find("show all") to reveal hidden text before extracting it.
+- Use extract_links to pull lists of people or jobs from search results.`
+  },
+  {
+    match: (url) => url.includes('reddit.com'),
+    playbook: `\n\nPLATFORM PLAYBOOK: REDDIT
+- Reddit uses infinite scrolling. You must use the scroll tool to load more posts or comments.
+- Comments are often collapsed under "more replies".
+- Prefer find() and read_section() over read_page().`
+  },
+  {
+    match: (url) => url.includes('youtube.com'),
+    playbook: `\n\nPLATFORM PLAYBOOK: YOUTUBE
+- YouTube is a heavy single-page application.
+- Do NOT use read_page on YouTube, as the DOM is huge and will blow out your context limit. Use find() to locate search boxes and specific videos.
+- Video descriptions are hidden by default; you must find and click the "...more" button to read them.`
+  },
+  {
+    match: (url) => url.includes('x.com') || url.includes('twitter.com'),
+    playbook: `\n\nPLATFORM PLAYBOOK: X / TWITTER
+- Twitter heavily recycles DOM elements as you scroll.
+- To read a full thread, scroll down multiple times and use read_section.
+- Do NOT use read_page on the main feed as it will exceed context limits.`
+  }
+];
+
+function buildSystemPrompt(config, startingUrl = '') {
   let prompt = BASE_PROMPT + (LANGUAGE_INSTRUCTIONS[config.resolvedLanguage] || '');
+
+  if (startingUrl) {
+    for (const pb of PLATFORM_PLAYBOOKS) {
+      if (pb.match(startingUrl)) {
+        prompt += pb.playbook;
+      }
+    }
+  }
 
   if (config.hasKnowledge) {
     prompt += `\n\nTHE USER'S KNOWLEDGE BASE
@@ -144,6 +216,30 @@ export class AgentRun {
       limits: { pageChars: this.pageChars },
       cdpMode: config.cdpMode || 'off',
       onTrusted: this.onTrusted,
+      spawnAgent: async (url, task) => {
+        const tab = await chrome.tabs.create({ url, active: false });
+        const dummySession = {
+          id: 'sub_' + Date.now(),
+          messages: [{ role: 'user', content: [{ type: 'text', text: task }] }],
+          tabId: tab.id,
+          usage: { input: 0, output: 0, calls: 0, costUsd: 0 },
+          addArtifact: () => {}
+        };
+        const subAgent = new AgentRun({
+          provider: this.provider,
+          config: this.config,
+          session: dummySession,
+          emit: () => {}, // Background swarm runs silently
+          requestApproval: async () => true, // Auto-approve swarms
+          scope: scope,
+          onTrusted: onTrusted
+        });
+        try {
+          return await subAgent.runDirect(dummySession.messages, { maxSteps: 10 });
+        } finally {
+          await chrome.tabs.remove(tab.id).catch(() => {});
+        }
+      },
     };
   }
 
@@ -165,8 +261,49 @@ export class AgentRun {
       compact: this.provider.preferCompactTools,
       hasKnowledge: !!this.config.hasKnowledge,
     });
-    this.system = buildSystemPrompt(this.config);
+    
+    let startingUrl = '';
+    try {
+      if (this.session.tabId) {
+        const tab = await chrome.tabs.get(this.session.tabId);
+        startingUrl = tab.url || '';
+      }
+    } catch (err) {
+      // ignore
+    }
+    
+    this.system = buildSystemPrompt(this.config, startingUrl);
+    
+    if (this.session.macroSteps) {
+      return this.runMacro(this.session.macroSteps);
+    }
+    
     return this.shouldPlan() ? this.runPlanned() : this.runDirect(this.session.messages);
+  }
+
+  // ------------------------------------------------------------- macro mode
+  
+  async runMacro(steps) {
+    this.emit({ kind: 'status', status: 'running', step: 0, maxSteps: steps.length });
+    
+    for (let i = 0; i < steps.length; i++) {
+      if (this.stopped) return;
+      const call = steps[i];
+      this.emit({ kind: 'plan_step', index: i, state: 'running', text: `Macro Step: ${call.name}` });
+      
+      try {
+        await this.runToolCall(call);
+        this.emit({ kind: 'plan_step', index: i, state: 'done', text: `Macro Step: ${call.name}` });
+      } catch (err) {
+        if (this.stopped) return;
+        this.emit({ kind: 'plan_step', index: i, state: 'error', text: `Macro Step: ${call.name}` });
+        throw this.explainFailure(err);
+      }
+    }
+    
+    const msg = "Macro execution completed successfully.";
+    this.emit({ kind: 'assistant', text: msg });
+    return msg;
   }
 
   // ------------------------------------------------------------- direct mode
@@ -313,6 +450,16 @@ export class AgentRun {
 
     this.emit({ kind: 'plan', steps: plan });
 
+    if (this.config.approvalMode === 'ask') {
+      this.emit({ kind: 'approval_request', call: { name: 'Execute Plan?', input: plan } });
+      const approved = await this.requestApproval();
+      if (!approved) {
+        this.emit({ kind: 'assistant', text: 'Execution was canceled by the user.' });
+        return;
+      }
+      this.emit({ kind: 'status', status: 'running', step: 0, maxSteps: this.config.maxSteps || 30 });
+    }
+
     const findings = [];
     const perStep = Math.max(4, Math.floor((this.config.maxSteps || 30) / plan.length));
 
@@ -434,12 +581,32 @@ export class AgentRun {
   recordUsage(response) {
     if (!response?.usage) return;
     const usage = this.session.usage;
-    usage.input += response.usage.input || 0;
-    usage.output += response.usage.output || 0;
+    const addedInput = response.usage.input || 0;
+    const addedOutput = response.usage.output || 0;
+    
+    usage.input += addedInput;
+    usage.output += addedOutput;
     usage.calls += 1;
     usage.costUsd = estimateUsd(usage, this.rate);
     usage.rateKnown = !this.rate.unknown;
     this.emit({ kind: 'usage', usage: { ...usage } });
+    
+    // Global usage tracking
+    const providerName = this.config.provider;
+    const modelName = this.config.providers?.[providerName]?.model || 'default';
+    const modelId = `${providerName} - ${modelName}`;
+    
+    const marginalCost = estimateUsd({ input: addedInput, output: addedOutput, calls: 1 }, this.rate) || 0;
+    
+    chrome.storage.local.get(['global_usage']).then(({ global_usage = {} }) => {
+      const g = global_usage[modelId] || { input: 0, output: 0, calls: 0, costUsd: 0 };
+      g.input += addedInput;
+      g.output += addedOutput;
+      g.calls += 1;
+      g.costUsd += marginalCost;
+      global_usage[modelId] = g;
+      chrome.storage.local.set({ global_usage });
+    });
   }
 
   /**

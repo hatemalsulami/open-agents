@@ -424,6 +424,8 @@ chrome.runtime.onConnect.addListener((port) => {
             mentions: msg.mentions || [],
             restrictOrigins: !!msg.restrictOrigins,
           });
+        } else {
+          send({ type: 'session_lost', text: msg.text });
         }
         break;
       }
@@ -539,10 +541,11 @@ chrome.runtime.onConnect.addListener((port) => {
         const routine = (await getRoutines()).find((r) => r.id === msg.id);
         if (!routine) break;
         const manual = createSession(`🕒 ${routine.name}`);
+        if (routine.macroSteps) manual.macroSteps = routine.macroSteps;
         send({ type: 'session_snapshot', session: manual.snapshot(), focus: true });
         let tabId = null;
         if (routine.url) tabId = (await chrome.tabs.create({ url: routine.url, active: false })).id;
-        runTask(manual, routine.prompt, { tabId });
+        runTask(manual, routine.prompt || 'Executing Macro...', { tabId });
         break;
       }
     }
@@ -558,4 +561,85 @@ chrome.runtime.onConnect.addListener((port) => {
       }
     }
   });
+});
+
+// ---------------------------------------------------------------- context menus
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: "openagent-summarize",
+    title: "Summarize with OpenAgent",
+    contexts: ["selection"]
+  });
+  chrome.contextMenus.create({
+    id: "openagent-explain",
+    title: "Explain this with OpenAgent",
+    contexts: ["selection"]
+  });
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId.startsWith("openagent-")) {
+    // Open the side panel if it's not already open
+    chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {});
+
+    let prompt = "";
+    if (info.menuItemId === "openagent-summarize") {
+      prompt = `Please summarize the following text:\n\n"${info.selectionText}"`;
+    } else if (info.menuItemId === "openagent-explain") {
+      prompt = `Please explain the following text in detail:\n\n"${info.selectionText}"`;
+    }
+    
+    // Create a new session and run the task
+    const session = createSession(`Right Click Action`);
+    send({ type: 'session_snapshot', session: session.snapshot(), focus: true });
+    runTask(session, prompt, { tabId: tab.id });
+  }
+});
+
+// ---------------------------------------------------------------- iframe bypass (Canvas)
+
+const I_FRAME_BYPASS_RULE_ID = 1;
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [I_FRAME_BYPASS_RULE_ID],
+    addRules: [{
+      id: I_FRAME_BYPASS_RULE_ID,
+      priority: 1,
+      action: {
+        type: 'modifyHeaders',
+        responseHeaders: [
+          { header: 'x-frame-options', operation: 'remove' },
+          { header: 'frame-options', operation: 'remove' },
+          { header: 'content-security-policy', operation: 'remove' }
+        ]
+      },
+      condition: {
+        resourceTypes: ['sub_frame'],
+        initiatorDomains: [chrome.runtime.id]
+      }
+    }]
+  }).catch(err => console.error("Failed to add DNR rule:", err));
+});
+
+// ---------------------------------------------------------------- canvas synthesize
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'SYNTHESIZE_BOARD' && msg.widgets) {
+    chrome.sidePanel.open({ windowId: sender.tab?.windowId }).catch(() => {});
+    
+    // Create a plan for the agent
+    let prompt = `I have a dashboard named "${msg.boardName}". Here are the widgets on it:\n`;
+    msg.widgets.forEach((w, i) => {
+      prompt += `${i + 1}. URL: ${w.url}, Selector: ${w.selector}, Title: ${w.title}\n`;
+    });
+    prompt += `\nPlease navigate to these pages, extract the text from the specified selectors, and write a comprehensive "Morning Briefing" summary for me based on the live data you find. Use the spawn_agent tool to do it quickly if possible.`;
+    
+    const session = createSession(`Briefing: ${msg.boardName}`);
+    send({ type: 'session_snapshot', session: session.snapshot(), focus: true });
+    
+    // We run it on the current tab (which is the Canvas tab)
+    runTask(session, prompt, { tabId: sender.tab?.id });
+    sendResponse({ ok: true });
+  }
 });

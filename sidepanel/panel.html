@@ -10,31 +10,23 @@
   <header>
     <div class="brand">
       <span class="logo" data-icon="sparkle" data-icon-size="17"></span>
-      <button id="model-badge" class="badge">…</button>
     </div>
+    
+    <!-- Primary navigation now in top nav -->
+    <nav id="main-nav">
+      <button id="tab-chat" class="nav-tab active" data-i18n="nav.chat"></button>
+      <button id="tab-board" class="nav-tab" data-i18n="nav.board"></button>
+      <button id="tab-routines" class="nav-tab" data-i18n="nav.routines"></button>
+      <button id="tab-knowledge" class="nav-tab" data-i18n="nav.knowledge"></button>
+    </nav>
+    
     <div class="header-actions">
-      <button id="toggle-voice" class="tab-btn" data-icon="volumeOff" data-i18n-title="voice.toggleOff"></button>
-      <button id="toggle-lang" class="tab-btn lang-btn" data-i18n-title="header.language"></button>
-      <button id="open-dashboard" class="tab-btn" data-icon="gauge" data-i18n-title="header.dashboard"></button>
-      <button id="toggle-setup" class="tab-btn" data-icon="sliders" data-i18n-title="header.setup"></button>
+      <button id="model-badge" class="badge">…</button>
+      <button id="snip-element" class="tab-btn" data-icon="crop" title="Snip Element to Canvas"></button>
+      <button id="open-canvas" class="tab-btn" data-icon="layout" title="Live Canvas"></button>
+      <button id="open-dashboard" class="tab-btn" data-icon="sliders" data-i18n-title="header.dashboard"></button>
     </div>
   </header>
-
-  <!-- Primary navigation: one row of labelled tabs -->
-  <nav id="main-nav">
-    <button id="tab-chat" class="nav-tab active" data-icon="chat" data-i18n-title="header.agents">
-      <span data-i18n="nav.chat"></span>
-    </button>
-    <button id="tab-board" class="nav-tab" data-icon="board" data-i18n-title="header.board">
-      <span data-i18n="nav.board"></span>
-    </button>
-    <button id="tab-routines" class="nav-tab" data-icon="clock" data-i18n-title="header.routines">
-      <span data-i18n="nav.routines"></span>
-    </button>
-    <button id="tab-knowledge" class="nav-tab" data-icon="book" data-i18n-title="header.knowledge">
-      <span data-i18n="nav.knowledge"></span>
-    </button>
-  </nav>
 
   <!-- Provider setup, inline so the options page is never required -->
   <section id="setup-card" class="card hidden">
@@ -209,6 +201,7 @@
       <div id="mention-picker" class="hidden"></div>
       <div class="composer">
         <textarea id="input" rows="1" data-i18n-placeholder="composer.placeholder"></textarea>
+        <button id="dictate-btn" class="ghost send-btn" data-icon="mic" title="Voice Input"></button>
         <button id="send-btn" class="primary send-btn" data-icon="send" data-i18n-title="composer.send"></button>
       </div>
     </div>

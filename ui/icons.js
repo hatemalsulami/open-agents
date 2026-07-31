@@ -55,6 +55,7 @@ const ICONS = {
     { tag: 'circle', attrs: { cx: 12, cy: 12, r: 3.5, fill: 'currentColor', stroke: 'none' } },
   ],
   spinner: ['M12 3a9 9 0 1 0 9 9'],
+  mic: ['M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z', 'M19 10v2a7 7 0 0 1-14 0v-2', 'M12 19v4', 'M8 23h8'],
 };
 
 /** Builds an icon element. @returns {SVGElement} */

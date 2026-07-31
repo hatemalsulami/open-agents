@@ -14,7 +14,10 @@
     "alarms",
     "notifications",
     "offscreen",
-    "debugger"
+    "debugger",
+    "downloads",
+    "contextMenus",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -26,6 +29,13 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/customizer.js"],
+      "run_at": "document_start"
+    }
+  ],
   "side_panel": {
     "default_path": "sidepanel/panel.html"
   },

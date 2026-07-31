@@ -59,15 +59,44 @@ export function renderMarkdown(text) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    const fence = /^```/.test(line);
+    const fence = /^```(.*)$/.exec(line);
     if (fence) {
       closeList();
+      const lang = fence[1].trim();
+      
+      const wrap = document.createElement('div');
+      wrap.className = 'code-block';
+      
+      const head = document.createElement('div');
+      head.className = 'code-head';
+      
+      if (lang) {
+        const langSpan = document.createElement('span');
+        langSpan.className = 'code-lang';
+        langSpan.textContent = lang;
+        head.appendChild(langSpan);
+      }
+      
       const pre = document.createElement('pre');
       const body = [];
       i++;
       while (i < lines.length && !/^```/.test(lines[i])) body.push(lines[i++]);
-      pre.textContent = body.join('\n');
-      fragment.appendChild(pre);
+      const codeText = body.join('\n');
+      pre.textContent = codeText;
+      
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'copy-btn';
+      copyBtn.textContent = 'Copy';
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(codeText).catch(()=>{});
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => copyBtn.textContent = 'Copy', 2000);
+      });
+      head.appendChild(copyBtn);
+      
+      wrap.appendChild(head);
+      wrap.appendChild(pre);
+      fragment.appendChild(wrap);
       continue;
     }
 

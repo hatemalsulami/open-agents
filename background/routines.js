@@ -30,8 +30,12 @@ export async function saveRoutine(routine) {
     enabled: routine.enabled !== false,
     lastRun: routine.lastRun || null,
     lastResult: routine.lastResult || null,
+    macroSteps: routine.macroSteps || null, // Optional recorded tool steps for zero-shot execution
   };
-  if (!entry.prompt) throw new Error('A routine needs a task description.');
+  
+  if (!entry.prompt && !entry.macroSteps) {
+    throw new Error('A routine needs either a task description or recorded macro steps.');
+  }
 
   const index = routines.findIndex((r) => r.id === entry.id);
   if (index >= 0) routines[index] = { ...routines[index], ...entry };

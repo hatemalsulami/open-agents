@@ -3,7 +3,7 @@
 // run here in the service worker.
 
 import { checkTabAllowed, checkUrlAllowed, admitTab } from './scope.js';
-import { searchKnowledge } from './knowledge.js';
+import { searchKnowledge, addDoc } from './knowledge.js';
 import * as cdp from './cdp.js';
 
 const INPUT_TOOLS = new Set(['click', 'type_text', 'press_key']);
@@ -45,6 +45,31 @@ export const TOOL_DEFINITIONS = [
       },
       required: ['query'],
     },
+  },
+  {
+    name: 'save_to_knowledge',
+    description:
+      'Save important information, extracted data, or research to the user\'s persistent Knowledge Base. The user can see this in their UI, and you can search it later across different sessions. Use this to take notes across tasks or build lists.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'A short, clear title for the document.' },
+        text: { type: 'string', description: 'The text content to save. Markdown is recommended for structure.' },
+      },
+      required: ['name', 'text'],
+    },
+  },
+  {
+    name: 'download_file',
+    description: 'Trigger a file download to the user\'s local computer. Use this when the user asks you to extract data, compile a list, or generate a report (e.g. CSV, JSON, TXT). You provide the raw file content and the desired filename.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'The name of the file to save (e.g. "leads.csv", "report.md").' },
+        content: { type: 'string', description: 'The raw text content of the file.' },
+      },
+      required: ['filename', 'content']
+    }
   },
   {
     name: 'navigate',
@@ -175,6 +200,31 @@ export const TOOL_DEFINITIONS = [
     input_schema: { type: 'object', properties: {} },
   },
   {
+    name: 'fetch_api',
+    description: 'Make a fetch request from the current page to any API URL. This automatically uses the user\'s logged-in cookies and bypasses CORS. Use this to quickly extract JSON data directly from the website\'s backend APIs instead of parsing the messy DOM.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The API URL to fetch (e.g. "https://api.twitter.com/...").' },
+        method: { type: 'string', description: 'GET, POST, etc. Defaults to GET.' },
+      },
+      required: ['url']
+    }
+  },
+  {
+    name: 'query_dom',
+    description:
+      'Run a CSS selector to quickly extract text from the page without reading the entire DOM. Use this to surgically extract structured data (like prices, product names, or table rows) if you know the CSS class or tag. It returns the innerText of the matched elements.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string', description: 'A valid CSS selector (e.g. ".price-tag", "table tr td").' },
+        limit: { type: 'number', description: 'Max matches to return (default 10).' }
+      },
+      required: ['selector'],
+    },
+  },
+  {
     name: 'list_tabs',
     description: 'List open tabs in the current window with their ids, titles, and URLs.',
     input_schema: { type: 'object', properties: {} },
@@ -214,11 +264,83 @@ export const TOOL_DEFINITIONS = [
       properties: { seconds: { type: 'number', description: 'Default 2, max 10.' } },
     },
   },
+  {
+    name: 'spawn_agent',
+    description: 'SPAWN A BACKGROUND AGENT: Delegate a sub-task to a parallel background tab. The spawned agent will navigate to the URL, complete the task, and return its final written answer to you. Use this to open and process multiple links simultaneously.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The starting URL for the background agent.' },
+        task: { type: 'string', description: 'The exact instruction for the background agent.' },
+      },
+      required: ['url', 'task'],
+    },
+  },
+  {
+    name: 'customize_page',
+    description: 'Customize the visual appearance of the current page or remove annoying elements permanently. These changes will be saved and automatically applied every time the user visits this domain. Use this when the user asks to change colors, hide sidebars, or "zap" elements.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        theme: {
+          type: 'object',
+          description: 'Global theme changes for the page.',
+          properties: {
+            bg: { type: 'string', description: 'Background color (CSS color value like #000000 or red).' },
+            color: { type: 'string', description: 'Text color (CSS color value).' },
+            font: { type: 'string', description: 'Font family name.' }
+          }
+        },
+        hide_selectors: {
+          type: 'array',
+          description: 'A list of CSS selectors for elements that should be permanently hidden (e.g. [".ad-banner", "#cookie-popup"]).',
+          items: { type: 'string' }
+        },
+        custom_css: {
+          type: 'string',
+          description: 'Any additional raw CSS to inject into the page.'
+        },
+        clear: {
+          type: 'boolean',
+          description: 'If true, clears all previous customizations for this domain.'
+        }
+      }
+    }
+  },
+  {
+    name: 'extract_artifact',
+    description: 'Extract a specific visual component (widget) from the current webpage and save it to the user\'s Live Canvas dashboard. Use this when the user asks to "save this chart", "add this widget to my board", or "extract the news list". You must provide a CSS selector that isolates the requested component.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string', description: 'The CSS selector of the component to extract (e.g., .weather-widget, #main-chart, .news-feed).' },
+        title: { type: 'string', description: 'A short, human-readable name for this widget to display on the dashboard.' },
+        boardName: { type: 'string', description: 'Optional. The name of the Canvas board to add this widget to (e.g., "News", "Stocks"). If omitted, it goes to the default board.' }
+      },
+      required: ['selector', 'title']
+    }
+  },
+  {
+    name: 'zen_mode',
+    description: 'Trigger a distraction-free, beautiful reading overlay on the current page. The extension will automatically extract the main article and hide all ads, sidebars, and noise. Use this when the user asks to "declutter the page", "enter reader mode", or "turn on zen mode".',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'open_canvas',
+    description: 'Open the user\'s Live Canvas dashboard in a new browser tab. Call this tool after you have finished extracting artifacts/widgets for the user, so they can immediately see the board you created.',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    }
+  },
 ];
 
 const PAGE_TOOLS = new Set([
   'read_page', 'get_page_text', 'find', 'read_section', 'extract_links',
-  'click', 'type_text', 'select_option', 'scroll', 'press_key',
+  'click', 'type_text', 'select_option', 'scroll', 'press_key', 'query_dom', 'fetch_api', 'customize_page', 'extract_artifact', 'zen_mode'
 ]);
 
 // Page tools whose output scales with page size, so it must be capped.
@@ -230,13 +352,14 @@ const BULKY_TOOLS = new Set(['read_page', 'get_page_text', 'read_section', 'extr
 // model that reaches for read_page on a large site immediately runs out of room.
 const CORE_TOOL_NAMES = new Set([
   'navigate', 'find', 'read_section', 'extract_links', 'click', 'type_text', 'scroll', 'read_page',
-  'search_knowledge',
+  'search_knowledge', 'save_to_knowledge', 'query_dom', 'fetch_api', 'download_file', 'spawn_agent', 'customize_page', 'extract_artifact', 'zen_mode', 'open_canvas'
 ]);
 
 export function toolsFor({ compact = false, hasKnowledge = false } = {}) {
   const base = compact ? TOOL_DEFINITIONS.filter((t) => CORE_TOOL_NAMES.has(t.name)) : TOOL_DEFINITIONS;
   // Offering a tool that can only ever return "empty" wastes a model call.
-  return hasKnowledge ? base : base.filter((t) => t.name !== 'search_knowledge');
+  // Exception: we always want to be able to save knowledge, even if we don't have any yet.
+  return base;
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -487,10 +610,45 @@ export async function executeTool(name, input, ctx, { inBatch = false } = {}) {
     case 'search_knowledge':
       return { text: await searchKnowledge(input.query, { maxChars: ctx.limits?.pageChars || 4000 }) };
 
+    case 'save_to_knowledge':
+      await addDoc({ name: input.name, text: input.text, kind: 'note' });
+      return { text: `Saved "${input.name}" to the knowledge base. You can retrieve it later with search_knowledge.` };
+
+    case 'download_file': {
+      let base64Content;
+      try {
+        base64Content = btoa(unescape(encodeURIComponent(input.content || '')));
+      } catch (e) {
+        throw new Error('Failed to encode file content. Ensure it is valid text.');
+      }
+      
+      let mimeType = 'text/plain';
+      if (input.filename.endsWith('.csv')) mimeType = 'text/csv';
+      else if (input.filename.endsWith('.json')) mimeType = 'application/json';
+      else if (input.filename.endsWith('.md')) mimeType = 'text/markdown';
+      else if (input.filename.endsWith('.html')) mimeType = 'text/html';
+      
+      const url = `data:${mimeType};base64,${base64Content}`;
+      await chrome.downloads.download({ url: url, filename: input.filename, saveAs: false });
+      return { text: `Successfully triggered download for "${input.filename}".` };
+    }
+
     case 'wait': {
       const seconds = Math.min(Math.max(input.seconds ?? 2, 0.5), 10);
       await sleep(seconds * 1000);
       return { text: `Waited ${seconds}s.` };
+    }
+
+    case 'spawn_agent': {
+      if (!ctx.spawnAgent) throw new Error('Swarming is not supported in this context.');
+      const result = await ctx.spawnAgent(input.url, input.task);
+      return { text: `Background agent on ${input.url} completed its task. Result:\n${result}` };
+    }
+
+    case 'open_canvas': {
+      const url = chrome.runtime.getURL('canvas/canvas.html');
+      await chrome.tabs.create({ url });
+      return { text: 'Live Canvas dashboard successfully opened in a new tab.' };
     }
 
     default: {
